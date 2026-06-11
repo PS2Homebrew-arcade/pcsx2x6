@@ -196,8 +196,13 @@ NM00031:
   bootprog: SC3LOAD
   media: DVD
   input: button
+  clampModes:
+    vuClampMode: 2 # Respawn issues, Fixes SPS, avoids teleporting characters.
+  gameFixes:
+    - EETimingHack # Fixes bad colours on character select when in Progressive Scan.
   gsHWFixes:
-    alignSprite: 1
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 2 # Fixes misaligned bloom.
 NM00032:
   name: Time Crisis 4
   region: System256
