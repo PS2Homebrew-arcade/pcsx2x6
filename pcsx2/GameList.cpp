@@ -234,7 +234,9 @@ const char* GameList::EntryCompatibilityRatingToString(CompatibilityRating ratin
 
 bool GameList::IsScannableFilename(const std::string_view path)
 {
-	return VMManager::IsDiscFileName(path) || VMManager::IsElfFileName(path) || VMManager::isArcadeManifest(path);
+	return // VMManager::IsDiscFileName(path) || 
+		VMManager::IsElfFileName(path) || 
+		VMManager::isArcadeManifest(path);
 }
 
 void GameList::FillBootParametersForEntry(VMBootParameters* params, const Entry* entry)
