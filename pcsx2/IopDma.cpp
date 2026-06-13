@@ -84,6 +84,10 @@ void spu2DMA4Irq()
 void psxDma7(u32 madr, u32 bcr, u32 chcr) // SPU2's Core 1
 {
 	psxDmaGeneric(madr, bcr, chcr, 1);
+	// AC sound modules (BR3, TK5DR) poll the transfer status right after the kick,
+	// so complete it now instead of on the slow deferred schedule.
+	spu2DMA7Irq();
+	SPU2finishDMA7();
 }
 
 int psxDma7Interrupt()

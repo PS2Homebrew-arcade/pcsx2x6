@@ -69,17 +69,21 @@ void SPU2writeDMA4Mem(u16* pMem, u32 size) // size now in 16bit units
 void SPU2interruptDMA4()
 {
 	SPU2::FileLog("[%10d] SPU2 interruptDMA4\n", Cycles);
-	if (Cores[0].DmaMode)
-		Cores[0].Regs.STATX |= 0x80;
 	Cores[0].Regs.STATX &= ~0x400;
 	Cores[0].TSA = Cores[0].ActiveTSA;
+}
+
+// After an instant DMA7 completion, cancel the scheduled deferred one so it can't
+// fire late on the next transfer (that breaks TK4's back-to-back boot streams).
+void SPU2finishDMA7()
+{
+	if (Cores[1].DMATransferComplete)
+		Cores[1].DMAICounter = 0;
 }
 
 void SPU2interruptDMA7()
 {
 	SPU2::FileLog("[%10d] SPU2 interruptDMA7\n", Cycles);
-	if (Cores[1].DmaMode)
-		Cores[1].Regs.STATX |= 0x80;
 	Cores[1].Regs.STATX &= ~0x400;
 	Cores[1].TSA = Cores[1].ActiveTSA;
 }
@@ -426,6 +430,13 @@ u16 SPU2read(u32 rmem)
 			//FileLog("[%10d] SPU2 read mem %x (core %d, register %x): %x\n",Cycles, mem, core, (omem & 0x7ff), ret);
 			SPU2::WriteRegLog("read", rmem, ret);
 #endif
+		}
+
+		if ((omem & 0x3FF) == 0x344 && Cores[core].DMATransferComplete)
+		{
+			ret &= ~0x80;
+			Cores[core].Regs.STATX |= 0x80;
+			Cores[core].DMATransferComplete = false;
 		}
 	}
 

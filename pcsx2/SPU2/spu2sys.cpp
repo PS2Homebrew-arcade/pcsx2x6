@@ -196,6 +196,7 @@ void V_Core::Init(int index)
 
 	DMAICounter = 0;
 	AdmaInProgress = false;
+	DMATransferComplete = false;
 
 	Regs.STATX = 0x80;
 	Regs.ENDX = 0xffffff; // PS2 confirmed
@@ -1017,7 +1018,6 @@ static void RegWrite_Core(u16 value)
 			bool irqe = thiscore.IRQEnable;
 			int bit0 = thiscore.AttrBit0;
 			bool oldFXenable = thiscore.FxEnable;
-			u8 oldDmaMode = thiscore.DmaMode;
 
 			thiscore.AttrBit0 = (value >> 0) & 0x01;  //1 bit
 			thiscore.DMABits = (value >> 1) & 0x07;   //3 bits
@@ -1037,10 +1037,12 @@ static void RegWrite_Core(u16 value)
 					thiscore.AnalyzeReverbPreset();
 			}
 
-			if (!thiscore.DmaMode && !(thiscore.Regs.STATX & 0x400))
+			// DMA mode switched off: drop stale status and abandon any unfinished transfer
+			if (!thiscore.DmaMode)
+			{
 				thiscore.Regs.STATX &= ~0x80;
-			else if (!oldDmaMode && thiscore.DmaMode)
-				thiscore.Regs.STATX |= 0x80;
+				thiscore.ReadSize = 0;
+			}
 
 			thiscore.ActiveTSA = thiscore.TSA;
 

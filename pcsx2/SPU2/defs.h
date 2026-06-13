@@ -470,6 +470,7 @@ struct V_Core
 	u16* DMARPtr; // Mem pointer for DMA Reads
 	u32 ReadSize;
 	bool IsDMARead;
+	bool DMATransferComplete; // set when a DMA finishes, reported once on the next STATX read
 
 	u32 KeyOn;
 	u32 KeyOff;

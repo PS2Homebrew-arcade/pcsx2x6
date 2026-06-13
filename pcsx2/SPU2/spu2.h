@@ -75,6 +75,7 @@ void SPU2readDMA4Mem(u16* pMem, u32 size);
 void SPU2writeDMA4Mem(u16* pMem, u32 size);
 void SPU2interruptDMA4();
 void SPU2interruptDMA7();
+void SPU2finishDMA7();
 void SPU2readDMA7Mem(u16* pMem, u32 size);
 void SPU2writeDMA7Mem(u16* pMem, u32 size);
 

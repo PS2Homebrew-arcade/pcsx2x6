@@ -154,6 +154,7 @@ void V_Core::StartADMAWrite(u16* pMem, u32 sz)
 	int size = sz;
 
 	TimeUpdate(psxRegs.cycle);
+	DMATransferComplete = false;
 
 	if (SPU2::MsgAutoDMA())
 	{
@@ -225,6 +226,7 @@ void V_Core::PlainDMAWrite(u16* pMem, u32 size)
 
 	ReadSize = size;
 	IsDMARead = false;
+	DMATransferComplete = false;
 	DMAICounter = 0;
 	LastClock = psxRegs.cycle;
 	Regs.STATX &= ~0x80;
@@ -366,6 +368,9 @@ void V_Core::FinishDMAwrite()
 	ActiveTSA = TDA;
 	ActiveTSA &= 0xfffff;
 	TSA = ActiveTSA;
+
+	if (ReadSize == 0)
+		DMATransferComplete = true;
 }
 
 void V_Core::FinishDMAread()
@@ -451,6 +456,9 @@ void V_Core::FinishDMAread()
 	ActiveTSA = TDA;
 	ActiveTSA &= 0xfffff;
 	TSA = ActiveTSA;
+
+	if (!ReadSize)
+		DMATransferComplete = true;
 }
 
 void V_Core::DoDMAread(u16* pMem, u32 size)
@@ -461,6 +469,7 @@ void V_Core::DoDMAread(u16* pMem, u32 size)
 	ActiveTSA = TSA & 0xfffff;
 	ReadSize = size;
 	IsDMARead = true;
+	DMATransferComplete = false;
 	LastClock = psxRegs.cycle;
 	DMAICounter = (std::min(ReadSize, (u32)0x100) * CYCLES_PER_WORD);
 	Regs.STATX &= ~0x80;
@@ -516,7 +525,5 @@ void V_Core::DoDMAwrite(u16* pMem, u32 size)
 	else
 	{
 		PlainDMAWrite(pMem, size);
-		Regs.STATX &= ~0x80;
-		Regs.STATX |= 0x400;
 	}
 }
