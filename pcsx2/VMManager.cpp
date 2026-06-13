@@ -1402,6 +1402,11 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 					Error::SetString(error, std::string("cannot open arcade media image"));
 					return false;
 				}
+				if (s_acmedia == "CD" && !ACATA::imgpath.empty()) {
+					CDVDsys_SetFile(CDVD_SourceType::Iso, ACATA::imgpath);
+					CDVDsys_ChangeSource(CDVD_SourceType::Iso);
+					Console.WriteLn(Color_Green, "ACGAME: CD media, also loading into CDVD subsystem");
+				}
 				Console.WriteLnFmt(Color_Green, "ACGAME: elf:'{}'", s_elf_override);
 				Console.WriteLnFmt(Color_Green, "ACGAME: sram:'{}'", ACSRAM::filepath);
 				Console.WriteLnFmt(Color_Green, "ACGAME: media:'{}'", ACATA::imgpath);
