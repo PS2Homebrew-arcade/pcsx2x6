@@ -358,6 +358,8 @@ static const std::map<std::string, FightingLayout> s_fighting_layouts = {
 	{"NM00011", FightingLayout::STANDARD},   // Pride GP 2003
 	{"NM00018", FightingLayout::SIX_BUTTON}, // Capcom Fighting Jam
 	{"NM00042", FightingLayout::STANDARD},   // Sengoku Basara X
+	{"NM00017", FightingLayout::STANDARD},   // Mobile Suit Gundam Zeta - A.E.U.G. vs. Titans DX
+	{"NM00052", FightingLayout::STANDARD},   // Mobile Suit Gundam - Gundam vs. Gundam NEXT
 };
 
 // Gamepad input -> JVS button state: set or clear a button bit for a player
