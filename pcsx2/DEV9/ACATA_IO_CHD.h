@@ -37,6 +37,7 @@ public:
 
 private:
     bool ReadHunk(u32 hunk);
+    u32 DetectCdDataOffset();
 
     chd_file* m_chd = nullptr;
 
@@ -44,6 +45,7 @@ private:
 
     u32 m_hunkSize = 0;
     u32 m_unitBytes = 0;
+    u32 m_frameDataOffset = 0;  // where the 2048-byte payload sits inside a raw CD frame
 
     u64 m_totalUnits = 0;
 

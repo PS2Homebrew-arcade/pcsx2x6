@@ -43,8 +43,13 @@ bool ChdImage::Open(const std::string& path)
     m_unitBytes = hdr->unitbytes;
     m_totalUnits = hdr->logicalbytes / hdr->unitbytes;
 
+    // CD units are raw frames; find where the 2048-byte payload sits (DVD/HDD keep it at 0).
+    if (m_unitBytes == 2352 || m_unitBytes == 2448)
+        m_frameDataOffset = DetectCdDataOffset();
+
     m_hunkBuffer.resize(m_hunkSize);
 
+    DevCon.WriteLnFmt("{}: opened ok (unit {}, data offset {})", __FUNCTION__, m_unitBytes, m_frameDataOffset);
     return true;
 }
 
@@ -62,6 +67,7 @@ void ChdImage::Close()
 
     m_hunkSize = 0;
     m_unitBytes = 0;
+    m_frameDataOffset = 0;
     m_totalUnits = 0;
 
     m_type = ACMEDIATYPE::ACUNK;
@@ -88,6 +94,27 @@ u32 ChdImage::GetSectorSize() const
 u64 ChdImage::GetSectorCount() const
 {
     return m_totalUnits;
+}
+
+// CHD metadata gives the CD track format. Raw sectors (MODE1_RAW/MODE2_RAW) keep the
+// sync + header before the 2048-byte data (offset 16/24); plain MODE1/MODE2 store just
+// the 2048 data at offset 0 (like an ISO).
+u32 ChdImage::DetectCdDataOffset()
+{
+    char meta[256] = {};
+    u32 len = 0;
+    if (chd_get_metadata(m_chd, CDROM_TRACK_METADATA2_TAG, 0,
+                         meta, sizeof(meta), &len, nullptr, nullptr) != CHDERR_NONE &&
+        chd_get_metadata(m_chd, CDROM_TRACK_METADATA_TAG, 0,
+                         meta, sizeof(meta), &len, nullptr, nullptr) != CHDERR_NONE)
+        return 0;
+
+    // Match the track type (" TYPE:"), not the pregap type ("PGTYPE:").
+    if (std::strstr(meta, " TYPE:MODE2_RAW"))
+        return 24;
+    if (std::strstr(meta, " TYPE:MODE1_RAW"))
+        return 16;
+    return 0;
 }
 
 bool ChdImage::ReadHunk(u32 hunk)
@@ -131,7 +158,7 @@ bool ChdImage::ReadSector(u64 lba, void* buffer)
 
     if (m_unitBytes == 2448 || m_unitBytes == 2352)
     {
-        std::memcpy(buffer, m_hunkBuffer.data() + offset, 2048);
+        std::memcpy(buffer, m_hunkBuffer.data() + offset + m_frameDataOffset, 2048);
     }
     else
     {
