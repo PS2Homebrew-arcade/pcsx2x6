@@ -24,27 +24,29 @@ bool ChdImage::Open(const std::string& path)
     const chd_header* hdr = chd_get_header(m_chd);
 
     m_hunkSize = hdr->hunkbytes;
-
-    switch (hdr->unitbytes)
-    {
-        case 2048:
-            m_type = ACMEDIATYPE::ACDVD;
-            break;
-
-        case 512:
-            m_type = ACMEDIATYPE::ACHDD;
-            break;
-
-        default:
-            m_type = ACMEDIATYPE::ACUNK;
-            break;
-    }
-
     m_unitBytes = hdr->unitbytes;
     m_totalUnits = hdr->logicalbytes / hdr->unitbytes;
-
     m_hunkBuffer.resize(m_hunkSize);
 
+    // Work out the layout once: HDD/DVD units are already the logical sector; CD units are
+    // raw frames whose 2048-byte payload sits at a track-dependent offset (read from metadata).
+    if (m_unitBytes == 2352 || m_unitBytes == 2448)
+    {
+        m_type = ACMEDIATYPE::ACCD;
+        m_logicalSize = 2048;
+        m_frameDataOffset = DetectCdDataOffset();
+    }
+    else
+    {
+        m_type = (m_unitBytes == 2048) ? ACMEDIATYPE::ACDVD
+               : (m_unitBytes == 512)  ? ACMEDIATYPE::ACHDD
+               :                         ACMEDIATYPE::ACUNK;
+        m_logicalSize = m_unitBytes;
+        m_frameDataOffset = 0;
+    }
+
+    DevCon.WriteLnFmt("{}: opened ok (unit {}, logical {}, data offset {})",
+                      __FUNCTION__, m_unitBytes, m_logicalSize, m_frameDataOffset);
     return true;
 }
 
@@ -62,6 +64,8 @@ void ChdImage::Close()
 
     m_hunkSize = 0;
     m_unitBytes = 0;
+    m_logicalSize = 0;
+    m_frameDataOffset = 0;
     m_totalUnits = 0;
 
     m_type = ACMEDIATYPE::ACUNK;
@@ -79,15 +83,32 @@ ACMEDIATYPE ChdImage::GetType() const
 
 u32 ChdImage::GetSectorSize() const
 {
-    // MAME CD CHDs: libchdr CD codecs already extract user data (2048) from raw sectors
-    if (m_unitBytes == 2448 || m_unitBytes == 2352)
-        return 2048;
-    return m_unitBytes;
+    return m_logicalSize;
 }
 
 u64 ChdImage::GetSectorCount() const
 {
     return m_totalUnits;
+}
+
+// The CHD's metadata names the CD track format; map it to where the 2048-byte payload
+// starts (raw modes prepend a sync + header; cooked modes keep it at offset 0).
+u32 ChdImage::DetectCdDataOffset()
+{
+    char meta[256] = {};
+    u32 len = 0;
+    if (chd_get_metadata(m_chd, CDROM_TRACK_METADATA2_TAG, 0,
+                         meta, sizeof(meta), &len, nullptr, nullptr) != CHDERR_NONE &&
+        chd_get_metadata(m_chd, CDROM_TRACK_METADATA_TAG, 0,
+                         meta, sizeof(meta), &len, nullptr, nullptr) != CHDERR_NONE)
+        return 0;
+
+    // Match the track type (" TYPE:"), not the pregap type ("PGTYPE:").
+    if (std::strstr(meta, " TYPE:MODE2_RAW"))
+        return 24;
+    if (std::strstr(meta, " TYPE:MODE1_RAW"))
+        return 16;
+    return 0;
 }
 
 bool ChdImage::ReadHunk(u32 hunk)
@@ -129,14 +150,7 @@ bool ChdImage::ReadSector(u64 lba, void* buffer)
     if (!ReadHunk(hunk))
         return false;
 
-    if (m_unitBytes == 2448 || m_unitBytes == 2352)
-    {
-        std::memcpy(buffer, m_hunkBuffer.data() + offset, 2048);
-    }
-    else
-    {
-        std::memcpy(buffer, m_hunkBuffer.data() + offset, m_unitBytes);
-    }
+    std::memcpy(buffer, m_hunkBuffer.data() + offset + m_frameDataOffset, m_logicalSize);
 
     return true;
 }
@@ -146,12 +160,11 @@ bool ChdImage::ReadSectors(u64 lba,
                            void* buffer)
 {
     u8* dst = static_cast<u8*>(buffer);
-    const u32 outBytes = (m_unitBytes == 2448 || m_unitBytes == 2352) ? 2048 : m_unitBytes;
 
     for (u32 i = 0; i < count; i++)
     {
         if (!ReadSector(lba + i,
-                        dst + (i * outBytes)))
+                        dst + (i * m_logicalSize)))
         {
             return false;
         }
