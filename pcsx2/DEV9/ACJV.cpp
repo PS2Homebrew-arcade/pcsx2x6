@@ -109,30 +109,35 @@ static constexpr const std::array<InputBindingInfo, 12> s_jvs_p2_button_bindings
 	{"P2_Service", TRANSLATE_NOOP("JVS", "P2 Service"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE, GenericInputBinding::Select},
 }};
 
-// Per-layout face button GenericInputBinding overrides (BTN3-6 only).
-// BTN1=Square, BTN2=Triangle are universal. Indexed by FightingLayout enum value.
-static constexpr GenericInputBinding s_fighting_face_buttons[][4] = {
-	// BTN3,                        BTN4,                       BTN5,                       BTN6
-	{GenericInputBinding::Unknown, GenericInputBinding::Cross,  GenericInputBinding::Circle, GenericInputBinding::Unknown}, // TEKKEN
-	{GenericInputBinding::Cross,   GenericInputBinding::Circle, GenericInputBinding::Unknown,GenericInputBinding::Unknown}, // STANDARD
-	{GenericInputBinding::L1,      GenericInputBinding::Cross,  GenericInputBinding::Circle, GenericInputBinding::R1},      // SIX_BUTTON
+// Per-layout face button default inputs (BTN1-6), mirroring each game's
+// official PS2 port pad. Some games share the same layout. Rows follow FightingLayout order.
+static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
+	// BTN1,                       BTN2,                          BTN3,                         BTN4,                          BTN5,                         BTN6
+	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Unknown}, // TEKKEN
+	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Cross,   GenericInputBinding::Circle,   GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // YUYU
+	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::L1,      GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::R1},      // SIX_BUTTON
+	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Circle,  GenericInputBinding::Cross,    GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // SOULCAL
+	{GenericInputBinding::Square, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // BLOODYROAR
 };
 
 static std::array<InputBindingInfo, 12> s_active_p1_bindings;
 static std::array<InputBindingInfo, 12> s_active_p2_bindings;
 
-// Copy base P1/P2 tables, select BTN3-6 face buttons from the layout.
-// Table indices: [0-3]=dpad, [4]=BTN1, [5]=BTN2, [6]=BTN3, [7]=BTN4, [8]=BTN5, [9]=BTN6, [10]=start, [11]=service
+// Copy the base P1/P2 tables, then set the default pad button of BTN1-6 from
+// the game's layout row. Binding table indices:
+//   [0]=Up    [1]=Down  [2]=Left   [3]=Right
+//   [4]=BTN1  [5]=BTN2  [6]=BTN3   [7]=BTN4
+//   [8]=BTN5  [9]=BTN6  [10]=Start [11]=Service
 static void UpdateFightingBindings(FightingLayout layout)
 {
 	s_active_p1_bindings = s_jvs_p1_button_bindings;
 	s_active_p2_bindings = s_jvs_p2_button_bindings;
 	const auto& face = s_fighting_face_buttons[static_cast<int>(layout)];
-	constexpr int BTN3_INDEX = 6;
-	for (int i = 0; i < 4; i++)
+	constexpr int BTN1_INDEX = 4;
+	for (int i = 0; i < 6; i++)
 	{
-		s_active_p1_bindings[BTN3_INDEX + i].generic_mapping = face[i];
-		s_active_p2_bindings[BTN3_INDEX + i].generic_mapping = face[i];
+		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = face[i];
+		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = face[i];
 	}
 }
 
@@ -347,17 +352,17 @@ static const std::map<std::string, FightingLayout> s_fighting_layouts = {
 	{"NM00004", FightingLayout::TEKKEN},     // Tekken 4
 	{"NM00019", FightingLayout::TEKKEN},     // Tekken 5 / 5.1
 	{"NM00026", FightingLayout::TEKKEN},     // Tekken 5 DR
-	{"NM00007", FightingLayout::STANDARD},   // Soul Calibur II
-	{"NM00031", FightingLayout::STANDARD},   // Soul Calibur III
-	{"NM00002", FightingLayout::STANDARD},   // Bloody Roar 3
-	{"NM00048", FightingLayout::STANDARD},   // Fate Unlimited Codes
+	{"NM00007", FightingLayout::SOULCAL},    // Soul Calibur II
+	{"NM00031", FightingLayout::SOULCAL},    // Soul Calibur III
+	{"NM00002", FightingLayout::BLOODYROAR}, // Bloody Roar 3
+	{"NM00048", FightingLayout::SOULCAL},    // Fate Unlimited Codes
 	{"NM00027", FightingLayout::TEKKEN},     // Super Dragon Ball Z
-	{"NM00029", FightingLayout::STANDARD},   // Kinnikuman MGP
-	{"NM00035", FightingLayout::STANDARD},   // YuYu Hakusho
-	{"NM00040", FightingLayout::STANDARD},   // Kinnikuman MGP 2
-	{"NM00011", FightingLayout::STANDARD},   // Pride GP 2003
+	{"NM00029", FightingLayout::SOULCAL},    // Kinnikuman MGP
+	{"NM00035", FightingLayout::YUYU},       // YuYu Hakusho
+	{"NM00040", FightingLayout::SOULCAL},    // Kinnikuman MGP 2
+	{"NM00011", FightingLayout::TEKKEN},     // Pride GP 2003
 	{"NM00018", FightingLayout::SIX_BUTTON}, // Capcom Fighting Jam
-	{"NM00042", FightingLayout::STANDARD},   // Sengoku Basara X
+	{"NM00042", FightingLayout::SOULCAL},    // Sengoku Basara X
 };
 
 // Gamepad input -> JVS button state: set or clear a button bit for a player
@@ -444,7 +449,7 @@ void ACJV::SetGameId(const std::string& gameid)
 	auto fit = s_fighting_layouts.find(gameid);
 	if (fit != s_fighting_layouts.end())
 	{
-		constexpr const char* layout_names[] = {"tekken", "standard", "6-button"};
+		constexpr const char* layout_names[] = {"tekken", "yuyu", "6-button", "soulcalibur", "bloodyroar"};
 		Console.WriteLn("ACJV: fighting layout for %s: %s", gameid.c_str(), layout_names[static_cast<int>(fit->second)]);
 		UpdateFightingBindings(fit->second);
 	}
