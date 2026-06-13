@@ -44,10 +44,13 @@ enum class JVS_MODE {
 	TOUCH,
 };
 
+// Sw -> pad order per layout, mirroring each game's official PS2 port.
 enum class FightingLayout {
-	TEKKEN,     // Sw1,2,4,5 (skip Sw3) — TK4, TK5, TK5DR
-	STANDARD,   // Sw1,2,3,4 (sequential) — SC2, SC3, BRT, FUD, KN
-	SIX_BUTTON, // Sw1-6 — JAM, BAX
+	TEKKEN,     // Sw1,2,4,5: Square, Triangle, Cross, Circle         — TK4, TK5, TK5DR, SDBZ, PrideGP
+	YUYU,       // Sw1,2,3,4: Square, Triangle, Cross, Circle         — YuYu
+	SIX_BUTTON, // Sw1-6:     Square, Triangle, L1, Cross, Circle, R1 — JAM
+	SOULCAL,    // Sw1,2,3,4: Square, Triangle, Circle, Cross         — SC2, SC3, KN1, KN2, BAX, FUD
+	BLOODYROAR, // Sw1,2,3,4: Square, Cross, Circle, Triangle         — BR3
 };
 
 #define JVS_WHEEL_CHANNEL_MAX 3
