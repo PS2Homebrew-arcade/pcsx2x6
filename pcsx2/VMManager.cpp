@@ -83,6 +83,7 @@
 #include "common/ARCADE.h"
 
 #include "DEV9/ACATA.h"
+#include "DEV9/ACATAPI.h"
 #include "DEV9/ACJV.h"
 #include "DEV9/ACSRAM.h"
 
@@ -1864,6 +1865,9 @@ void VMManager::Shutdown(bool save_resume_state)
 	FWclose();
 	FileMcd_EmuClose();
 	ACATA::TH::IO_CloseImage();
+
+	// drop the previous game's cached ATAPI mode page so a game switch gets a fresh MODE_SENSE
+	ACATAPI::Reset();
 
 	// If the fullscreen UI is running, do a hardware reset on the GS
 	// so that the texture cache and targets are all cleared.

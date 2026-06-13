@@ -31,6 +31,7 @@ typedef union {
 namespace ACATAPI
 {
     void handle_cmd(atapi_packet_t P);
+    void Reset();
     void Setup(); // change ACATA stuff to handle CDROM instead of HDD
     u16 pio_read_word();
     bool has_pio_data();
