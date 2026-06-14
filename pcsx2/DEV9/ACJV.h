@@ -47,7 +47,7 @@ enum class JVS_MODE {
 // Sw -> pad order per layout, mirroring each game's official PS2 port.
 enum class FightingLayout {
 	TEKKEN,     // Sw1,2,4,5: Square, Triangle, Cross, Circle         — TK4, TK5, TK5DR, SDBZ, PrideGP
-	YUYU,       // Sw1,2,3,4: Square, Triangle, Cross, Circle         — YuYu
+	GUNDAM,     // Sw1,2,3,4: Square, Triangle, Cross, Circle         — YuYu + Gundam VS (zgundm/dx, SEED/Dest, GvG/NEXT)
 	SIX_BUTTON, // Sw1-6:     Square, Triangle, L1, Cross, Circle, R1 — JAM
 	SOULCAL,    // Sw1,2,3,4: Square, Triangle, Circle, Cross         — SC2, SC3, KN1, KN2, BAX, FUD
 	BLOODYROAR, // Sw1,2,3,4: Square, Cross, Circle, Triangle         — BR3

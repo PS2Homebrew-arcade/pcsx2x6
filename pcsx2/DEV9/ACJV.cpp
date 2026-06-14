@@ -114,7 +114,7 @@ static constexpr const std::array<InputBindingInfo, 12> s_jvs_p2_button_bindings
 static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
 	// BTN1,                       BTN2,                          BTN3,                         BTN4,                          BTN5,                         BTN6
 	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Unknown}, // TEKKEN
-	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Cross,   GenericInputBinding::Circle,   GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // YUYU
+	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Cross,   GenericInputBinding::Circle,   GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // GUNDAM (YuYu + Gundam VS)
 	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::L1,      GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::R1},      // SIX_BUTTON
 	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Circle,  GenericInputBinding::Cross,    GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // SOULCAL
 	{GenericInputBinding::Square, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // BLOODYROAR
@@ -358,11 +358,17 @@ static const std::map<std::string, FightingLayout> s_fighting_layouts = {
 	{"NM00048", FightingLayout::SOULCAL},    // Fate Unlimited Codes
 	{"NM00027", FightingLayout::TEKKEN},     // Super Dragon Ball Z
 	{"NM00029", FightingLayout::SOULCAL},    // Kinnikuman MGP
-	{"NM00035", FightingLayout::YUYU},       // YuYu Hakusho
+	{"NM00035", FightingLayout::GUNDAM},     // YuYu Hakusho
 	{"NM00040", FightingLayout::SOULCAL},    // Kinnikuman MGP 2
 	{"NM00011", FightingLayout::TEKKEN},     // Pride GP 2003
 	{"NM00018", FightingLayout::SIX_BUTTON}, // Capcom Fighting Jam
 	{"NM00042", FightingLayout::SOULCAL},    // Sengoku Basara X
+	{"NM00013", FightingLayout::GUNDAM},     // Z-Gundam: A.E.U.G. vs Titans
+	{"NM00017", FightingLayout::GUNDAM},     // Z-Gundam: A.E.U.G. vs Titans DX
+	{"NM00024", FightingLayout::GUNDAM},     // Gundam SEED: Federation vs Z.A.F.T.
+	{"NM00034", FightingLayout::GUNDAM},     // Gundam SEED Destiny: Federation vs Z.A.F.T. II
+	{"NM00043", FightingLayout::GUNDAM},     // Gundam vs Gundam
+	{"NM00052", FightingLayout::GUNDAM},     // Gundam vs Gundam NEXT
 };
 
 // Gamepad input -> JVS button state: set or clear a button bit for a player
@@ -449,7 +455,7 @@ void ACJV::SetGameId(const std::string& gameid)
 	auto fit = s_fighting_layouts.find(gameid);
 	if (fit != s_fighting_layouts.end())
 	{
-		constexpr const char* layout_names[] = {"tekken", "yuyu", "6-button", "soulcalibur", "bloodyroar"};
+		constexpr const char* layout_names[] = {"tekken", "gundam", "6-button", "soulcalibur", "bloodyroar"};
 		Console.WriteLn("ACJV: fighting layout for %s: %s", gameid.c_str(), layout_names[static_cast<int>(fit->second)]);
 		UpdateFightingBindings(fit->second);
 	}
