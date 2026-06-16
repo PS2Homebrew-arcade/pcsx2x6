@@ -408,6 +408,7 @@
     <None Include="GS\Renderers\Vulkan\VKEntryPoints.inl">
       <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
     </None>
+    <None Include="windows\MameOutputSender.exe" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Patch.cpp">

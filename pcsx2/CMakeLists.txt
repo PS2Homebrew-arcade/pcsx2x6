@@ -77,6 +77,7 @@ set(pcsx2Sources
 	HwRead.cpp
 	HwWrite.cpp
 	LayeredSettingsInterface.cpp
+	MameHookerProxy.cpp
 	INISettingsInterface.cpp
 	Interpreter.cpp
 	IopBios.cpp
@@ -171,6 +172,7 @@ set(pcsx2Headers
 	Mdec.h
 	MTGS.h
 	MTVU.h
+	MameHookerProxy.h
 	Memory.h
 	MemoryTypes.h
 	Patch.h
@@ -1318,6 +1320,8 @@ function(setup_main_executable target)
 		if(MSVC)
 			install(FILES $<TARGET_PDB_FILE:${target}> DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 		endif()
+
+		install(FILES "${PCSX2_SOURCE_DIR}/windows/MameOutputSender.exe" DESTINATION "${CMAKE_SOURCE_DIR}/bin")
 
 		# Copy dependency libraries.
 		set(DEPS_BINDIR "${CMAKE_SOURCE_DIR}/deps/bin")

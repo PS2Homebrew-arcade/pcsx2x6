@@ -98,6 +98,7 @@
     </None>
     <None Include="Docs\License.txt" />
     <None Include="ps2\eeHwTraceLog.inl" />
+    <None Include="windows\MameOutputSender.exe" />
     <None Include="x86\microVU_Alloc.inl" />
     <None Include="x86\microVU_Analyze.inl" />
     <None Include="x86\microVU_Branch.inl" />
