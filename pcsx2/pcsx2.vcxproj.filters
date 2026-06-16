@@ -408,7 +408,6 @@
     <None Include="GS\Renderers\Vulkan\VKEntryPoints.inl">
       <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
     </None>
-    <None Include="windows\MameOutputSender.exe" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Patch.cpp">
@@ -2459,5 +2458,8 @@
     <Natvis Include="GS\GS.natvis">
       <Filter>System\Ps2\GS</Filter>
     </Natvis>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="windows\MameOutputSender.exe" />
   </ItemGroup>
 </Project>

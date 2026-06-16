@@ -98,7 +98,12 @@
     </None>
     <None Include="Docs\License.txt" />
     <None Include="ps2\eeHwTraceLog.inl" />
-    <None Include="windows\MameOutputSender.exe" />
+    <CopyFileToFolders Include="windows\MameOutputSender.exe">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)\..\bin;%(DestinationFolders)</DestinationFolders>
+    </CopyFileToFolders>
     <None Include="x86\microVU_Alloc.inl" />
     <None Include="x86\microVU_Analyze.inl" />
     <None Include="x86\microVU_Branch.inl" />
