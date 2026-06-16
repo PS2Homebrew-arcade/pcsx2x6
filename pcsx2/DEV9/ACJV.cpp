@@ -9,6 +9,7 @@
 #include <array>
 #include <atomic>
 #include <string>
+#include "MameHookerProxy.h"
 
 enum ACJVCMD {
 	UNKNOWN = -2, // unknown CMD, should fire up a warning for developer
@@ -394,6 +395,12 @@ void ACJV::InsertCoin(u32 slot)
 void ACJV::SetMode(JVS_MODE mode)
 {
 	m_jvsMode = mode;
+
+	if (m_jvsMode == JVS_MODE::LIGHTGUN)
+	{
+		// Initialize MameHooker outputs for Lightgun Games
+		MameHookerProxy::GetInstance().StartGame(s_gameid);
+	}
 }
 
 JVS_MODE ACJV::GetMode()
@@ -850,7 +857,13 @@ void do_jvs_packet(const u8* input, u8* output) {
 				if(i == 1)
 				{
 					int p1Recoil = (gpvalue >= 0x50) ? 1 : 0;
+					if (p1Recoil)
+					{
+						Console.WriteLn("JVS: P1 recoil triggered (GPIO value: 0x%02X)", gpvalue);
+						MameHookerProxy::GetInstance().Gunshot(0);
+					}
 					(void)p1Recoil;
+
 				}
 			}
 
