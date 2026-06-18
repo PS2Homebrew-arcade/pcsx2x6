@@ -539,26 +539,37 @@ namespace usb_lightgun
 
 		const s32 new_pointer_index = s->GetSoftwarePointerIndex();
 
-		if (prev_pointer_index != new_pointer_index || s->cursor_path != cursor_path ||
-			s->cursor_scale != cursor_scale || s->cursor_color != cursor_color)
+		const bool cursor_changed =
+			(prev_pointer_index != new_pointer_index ||
+				s->cursor_path != cursor_path ||
+				s->cursor_scale != cursor_scale ||
+				s->cursor_color != cursor_color);
+
+		if (cursor_changed)
 		{
 			if (prev_pointer_index != new_pointer_index)
 				ImGuiManager::ClearSoftwareCursor(prev_pointer_index);
 
-			// Pointer changed, so need to update software cursor.
 			const bool had_software_cursor = !s->cursor_path.empty();
+
 			s->cursor_path = std::move(cursor_path);
 			s->cursor_scale = cursor_scale;
 			s->cursor_color = cursor_color;
-			if (!s->cursor_path.empty())
+
+			if (s->cursor_path.empty())
 			{
-				ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
-				s->UpdateSoftwarePointerPosition();
+				if (had_software_cursor)
+					ImGuiManager::ClearSoftwareCursor(new_pointer_index);
 			}
-			else if (had_software_cursor)
-			{
-				ImGuiManager::ClearSoftwareCursor(new_pointer_index);
-			}
+		}
+
+		// Always re-assert the configured cursor.
+		// ImGui cursor state can be cleared during VM/device shutdown even when
+		// GunCon2 settings did not change between games.
+		if (!s->cursor_path.empty())
+		{
+			ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
+			s->UpdateSoftwarePointerPosition();
 		}
 	}
 
