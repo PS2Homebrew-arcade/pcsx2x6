@@ -857,7 +857,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 				if(i == 1)
 				{
 					int p1Recoil = (gpvalue >= 0x50) ? 1 : 0;
-					if (p1Recoil)
+					// Vampire Night has issue/wierdness with output, when two players active gpvalue is always set to 0x60 constantly triggering recoil, so skipping it for now
+					if (p1Recoil && s_gameid != "NM00003")
 					{
 						Console.WriteLn("JVS: P1 recoil triggered (GPIO value: 0x%02X)", gpvalue);
 						MameHookerProxy::GetInstance().Gunshot(0);
