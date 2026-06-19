@@ -77,7 +77,6 @@ set(pcsx2Sources
 	HwRead.cpp
 	HwWrite.cpp
 	LayeredSettingsInterface.cpp
-	MameHookerProxy.cpp
 	INISettingsInterface.cpp
 	Interpreter.cpp
 	IopBios.cpp
@@ -138,6 +137,10 @@ set(pcsx2Sources
 	VUmicroMem.cpp
 	VUops.cpp
 )
+
+if(WIN32)
+	list(APPEND pcsx2Sources MameHookerProxy.cpp)
+endif()
 
 # Main pcsx2 header
 set(pcsx2Headers
