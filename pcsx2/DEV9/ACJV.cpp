@@ -153,6 +153,7 @@ static std::atomic<bool> s_sinden_border_enabled{false};
 static std::atomic<int> s_sinden_border_mode{0};
 static std::atomic<int> s_sinden_border_thickness{10};
 static std::string s_gameid;
+static bool s_last_recoil = false;
 
 std::span<const ACJV::DIPSwitchInfo> ACJV::GetDIPSwitches()
 {
@@ -854,17 +855,25 @@ void do_jvs_packet(const u8* input, u8* output) {
 				inWorkChecksum += gpvalue;
 				inSize--;
 
-				if(i == 1)
+				if (i == 1)
 				{
 					int p1Recoil = (gpvalue >= 0x50) ? 1 : 0;
-					// Vampire Night has issue/wierdness with output, when two players active gpvalue is always set to 0x60 constantly triggering recoil, so skipping it for now
-					if (p1Recoil && s_gameid != "NM00003")
+
+					// GPIO recoil seems to only be used by TC3 and TC4, but other games may set gpvalue for other purposes, so check game ID and recoil bit before triggering
+					if (p1Recoil && !s_last_recoil && (s_gameid == "NM00012" || s_gameid == "NM00032"))
 					{
 						Console.WriteLn("JVS: P1 recoil triggered (GPIO value: 0x%02X)", gpvalue);
 						MameHookerProxy::GetInstance().Gunshot(0);
+						s_last_recoil = true;
 					}
-					(void)p1Recoil;
 
+					// last recoil check is to avoid triggering multiple recoil events during continuous fire when gpvalue is held high
+					if (!p1Recoil)
+					{
+						s_last_recoil = false;
+					}
+
+					(void)p1Recoil;
 				}
 			}
 
