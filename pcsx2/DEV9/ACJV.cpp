@@ -1,11 +1,13 @@
 #include "common/Console.h"
 #include "ACMACROS.h"
 #include "ACJV.h"
+#include "ACUART.h"
 #include "Config.h"
 #include "Host.h"
 #include "Input/InputManager.h"
 #include "GS/GS.h"
 #include "common/SettingsInterface.h"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <string>
@@ -44,6 +46,7 @@ std::string BOARDS[] = {
 	"namco ltd.;FCB;Ver1.02;JPN,TouchPanel&Multipurpose",
 	"namco ltd.;TSS-I/O;Ver2.11;GUN-EXTENTION",
 	"namco ltd.;MIU-I/O;Ver2.05;JPN,GUN-EXTENTION",
+	"TAITO CORP.;I/O PCB-24/24/8/2SE;ver1.2forBG3;IN24/OUT24/AD8/DA2/SERIAL/EEPROM", // Battle Gear 3 / Tuned — real Taito board ID from its TMP95C063 firmware dump
 };
 enum BOARDID ACJV::CurrentBoardID = RAYS_PCB;
 
@@ -53,6 +56,7 @@ static constexpr const char* BOARD_DISPLAY_NAMES[] = {
 	"FCB (Touch Panel)",
 	"TSS-I/O (Gun Extension)",
 	"MIU-I/O (Gun Extension)",
+	"Taito I/O PCB-24/24/8/2SE (Battle Gear 3)",
 };
 
 static constexpr u16 DEFAULT_DIP_SWITCH_STATE =
@@ -109,6 +113,13 @@ static constexpr const std::array<InputBindingInfo, 12> s_jvs_p2_button_bindings
 	{"P2_Service", TRANSLATE_NOOP("JVS", "P2 Service"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE, GenericInputBinding::Select},
 }};
 
+static constexpr const std::array<InputBindingInfo, 4> s_jvs_wheel_bindings = {{ // driving analog bindings, auto-mirrored from Pad0
+	{"SteerRight", TRANSLATE_NOOP("JVS", "Steering Right"), nullptr, InputBindingInfo::Type::HalfAxis, 0, GenericInputBinding::LeftStickRight},
+	{"SteerLeft",  TRANSLATE_NOOP("JVS", "Steering Left"),  nullptr, InputBindingInfo::Type::HalfAxis, 1, GenericInputBinding::LeftStickLeft},
+	{"Gas",        TRANSLATE_NOOP("JVS", "Accelerator"),    nullptr, InputBindingInfo::Type::HalfAxis, 2, GenericInputBinding::R2},
+	{"Brake",      TRANSLATE_NOOP("JVS", "Brake"),          nullptr, InputBindingInfo::Type::HalfAxis, 3, GenericInputBinding::L2},
+}};
+
 // Per-layout face button default inputs (BTN1-6), mirroring each game's
 // official PS2 port pad. Some games share the same layout. Rows follow FightingLayout order.
 static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
@@ -138,6 +149,102 @@ static void UpdateFightingBindings(FightingLayout layout)
 	{
 		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = face[i];
 		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = face[i];
+	}
+}
+
+// Generic racing layout (BTN1-6): each entry sets its own JVS bit, so a game can wire switches beyond Sw1-6 (e.g. AD3's Push9).
+struct RacingButton { u16 bind_index; GenericInputBinding host; };
+static constexpr RacingButton s_racing_buttons[][6] = {
+	{ // ACEDRIVER3 (BTN1-6)
+		{JVS_BTN_1, GenericInputBinding::Square},   // ENTER
+		{JVS_BTN_2, GenericInputBinding::Unknown},  // unused
+		{JVS_BTN_3, GenericInputBinding::R1},       // GEAR UP
+		{JVS_BTN_4, GenericInputBinding::L1},       // GEAR DOWN (next to L2 = brake)
+		{JVS_BTN_5, GenericInputBinding::Unknown},  // unused
+		{JVS_BTN_9, GenericInputBinding::Triangle}, // VIEW CHANGE (Push9)
+	},
+};
+
+// Apply a racing layout: copy the base tables, then remap the buttons (JVS bit + pad button) per game.
+static void UpdateRacingBindings(RacingLayout layout)
+{
+	s_active_p1_bindings = s_jvs_p1_button_bindings;
+	s_active_p2_bindings = s_jvs_p2_button_bindings;
+	if (layout == RacingLayout::BG3)
+	{
+		// BG3/Tuned: JVS switch -> function map, RE'd from the game's switch chain @0x1e3f90.
+		const auto remap = [](std::array<InputBindingInfo, 12>& b) {
+			for (InputBindingInfo& e : b)
+			{
+				switch (e.bind_index)
+				{
+					case JVS_BTN_RIGHT: e.generic_mapping = GenericInputBinding::R1; break;       // SHIFT UP
+					case JVS_BTN_1:     e.generic_mapping = GenericInputBinding::L1; break;        // SHIFT DOWN
+					case JVS_BTN_DOWN:  e.generic_mapping = GenericInputBinding::Triangle; break;  // VIEW
+					case JVS_BTN_LEFT:  e.generic_mapping = GenericInputBinding::Square; break;    // SIDEBRAKE
+					case JVS_BTN_UP:    e.generic_mapping = GenericInputBinding::Circle; break;    // HAZARD
+					case JVS_BTN_START:
+					case JVS_BTN_SERVICE: break;
+					default:            e.generic_mapping = GenericInputBinding::Unknown; break;   // unused -> no double-trigger
+				}
+			}
+		};
+		remap(s_active_p1_bindings);
+		remap(s_active_p2_bindings);
+		return;
+	}
+	if (layout == RacingLayout::WANGAN)
+	{
+		// Wangan Midnight / R (NM00008/05): map confirmed live via I/O-TEST SWITCH-TEST.
+		const auto remap = [](std::array<InputBindingInfo, 12>& b) {
+			for (InputBindingInfo& e : b)
+			{
+				switch (e.bind_index)
+				{
+					case JVS_BTN_3: e.generic_mapping = GenericInputBinding::R1;       break; // Sw3 = SHIFT UP
+					case JVS_BTN_4: e.generic_mapping = GenericInputBinding::L1;       break; // Sw4 = SHIFT DOWN
+					case JVS_BTN_1: e.generic_mapping = GenericInputBinding::Square;   break; // Sw1
+					case JVS_BTN_2: e.generic_mapping = GenericInputBinding::Triangle; break; // Sw2
+					case JVS_BTN_5: e.generic_mapping = GenericInputBinding::Circle;   break; // Sw5
+					case JVS_BTN_6: e.generic_mapping = GenericInputBinding::Cross;    break; // Sw6
+					default: break;
+				}
+			}
+		};
+		remap(s_active_p1_bindings);
+		remap(s_active_p2_bindings);
+		return;
+	}
+	if (layout == RacingLayout::RRV)
+	{
+		// Ridge Racer V (NM00001): map from the switch builder FUN_0022ab70 (Ghidra).
+		const auto remap = [](std::array<InputBindingInfo, 12>& b) {
+			for (InputBindingInfo& e : b)
+			{
+				switch (e.bind_index)
+				{
+					case JVS_BTN_3: e.generic_mapping = GenericInputBinding::R1;       break; // Sw3 = SHIFT UP
+					case JVS_BTN_4: e.generic_mapping = GenericInputBinding::L1;       break; // Sw4 = SHIFT DOWN
+					case JVS_BTN_2: e.generic_mapping = GenericInputBinding::Triangle; break; // Sw2 = VIEW CHANGE
+					case JVS_BTN_1: e.generic_mapping = GenericInputBinding::Square;   break; // Sw1 = ENTER
+					case JVS_BTN_5: e.generic_mapping = GenericInputBinding::Unknown;  break; // unused -> no double-trigger
+					case JVS_BTN_6: e.generic_mapping = GenericInputBinding::Unknown;  break; // unused
+					default: break;
+				}
+			}
+		};
+		remap(s_active_p1_bindings);
+		remap(s_active_p2_bindings);
+		return;
+	}
+	const auto& btns = s_racing_buttons[static_cast<int>(layout)];
+	constexpr int BTN1_INDEX = 4;
+	for (int i = 0; i < 6; i++)
+	{
+		s_active_p1_bindings[BTN1_INDEX + i].bind_index = btns[i].bind_index;
+		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = btns[i].host;
+		s_active_p2_bindings[BTN1_INDEX + i].bind_index = btns[i].bind_index;
+		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = btns[i].host;
 	}
 }
 
@@ -185,7 +292,7 @@ bool ACJV::IsSuppressDaemonEnabled()
 
 const char* ACJV::GetBoardDisplayName(BOARDID id)
 {
-	if (id >= RAYS_PCB && id <= MIU_IO_JPN_GUN_EXTENTI)
+	if (id >= RAYS_PCB && id <= TAITO_BG3_IO_PCB)
 		return BOARD_DISPLAY_NAMES[id];
 	return "Unknown";
 }
@@ -204,14 +311,14 @@ static JVS_MODE m_jvsMode = JVS_MODE::DEFAULT;
 
 std::span<const InputBindingInfo> ACJV::GetButtonBindings()
 {
-	if (m_jvsMode == JVS_MODE::FIGHTING)
+	if (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE)
 		return s_active_p1_bindings;
 	return s_jvs_p1_button_bindings;
 }
 
 std::span<const InputBindingInfo> ACJV::GetP2ButtonBindings()
 {
-	if (m_jvsMode == JVS_MODE::FIGHTING)
+	if (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE)
 		return s_active_p2_bindings;
 	return s_jvs_p2_button_bindings;
 }
@@ -219,6 +326,11 @@ std::span<const InputBindingInfo> ACJV::GetP2ButtonBindings()
 std::span<const InputBindingInfo> ACJV::GetCoinBindings()
 {
 	return s_jvs_coin_bindings;
+}
+
+std::span<const InputBindingInfo> ACJV::GetWheelBindings()
+{
+	return s_jvs_wheel_bindings;
 }
 
 bool ACJV::GetDIPSwitchState(u32 index)
@@ -299,10 +411,12 @@ void ACJV::SetDefaultConfiguration(SettingsInterface& si)
 	si.SetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);
 }
 
+// The game reading the JVS board: return the requested word from its read buffer (rdbuf).
 u16 ACJV::Read16(u32 addr) {
     if (addr >= ACJV_RDBASE && addr < 0x124045FE) {
         int x = (addr - ACJV_RDBASE)/2;
-		if (x == 2 || x == 3 || x == 4) return rdbuf.at(x)|1;// initial polling expects these addrs to not be zero
+        // El_isra's initial-polling scaffold, disabled (tested OK without it):
+        // if (x == 2 || x == 3 || x == 4) return rdbuf.at(x)|1;// initial polling expects these addrs to not be zero
         return (u16)rdbuf.at(x);
     } else if ((addr == 0x124045FE)) {
 		return (u16)rdbuf.at((addr - ACJV_RDBASE)/2);
@@ -334,6 +448,11 @@ static float m_jvsLightgunDX = -1.0f;  // normalized display X (-1 = off-screen)
 static float m_jvsLightgunDY = -1.0f;  // normalized display Y (-1 = off-screen)
 static u16 m_jvsWheelChannels[JVS_WHEEL_CHANNEL_MAX] = {};
 static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
+
+static float m_wheelSteerR = 0.0f; // stick right  -> steering positive
+static float m_wheelSteerL = 0.0f; // stick left   -> steering negative
+static float m_wheelGas    = 0.0f; // right trigger (R2)
+static float m_wheelBrake  = 0.0f; // left trigger  (L2)
 
 // Per-game JVS button mapping for lightgun games, keyed by NM game ID (see issue #9).
 // Field order: pedal, sensor, sensor_active_high, p1_start, p2_start, p1_trigger, p2_trigger
@@ -371,6 +490,15 @@ static const std::map<std::string, FightingLayout> s_fighting_layouts = {
 	{"NM00052", FightingLayout::GUNDAM},     // Gundam vs Gundam NEXT
 };
 
+static const std::map<std::string, RacingLayout> s_racing_layouts = {
+	{"NM00047", RacingLayout::ACEDRIVER3},   // Ace Driver 3: Final Turn
+	{"NM00010", RacingLayout::BG3},          // Battle Gear 3
+	{"NM00015", RacingLayout::BG3},          // Battle Gear 3 Tuned
+	{"NM00008", RacingLayout::WANGAN},       // Wangan Midnight
+	{"NM00005", RacingLayout::WANGAN},       // Wangan Midnight R
+	{"NM00001", RacingLayout::RRV},          // Ridge Racer V (discovery sweep)
+};
+
 // Gamepad input -> JVS button state: set or clear a button bit for a player
 void ACJV::SetButtonState(u32 player, u16 mask, bool pressed)
 {
@@ -396,10 +524,31 @@ void ACJV::SetMode(JVS_MODE mode)
 	m_jvsMode = mode;
 }
 
+void ACJV::SetWheelAxis(u32 axis, float value)
+{
+	switch (axis)
+	{
+		case 0: m_wheelSteerR = value; break;
+		case 1: m_wheelSteerL = value; break;
+		case 2: m_wheelGas    = value; break;
+		case 3: m_wheelBrake  = value; break;
+		default: break;
+	}
+}
+
 JVS_MODE ACJV::GetMode()
 {
 	return m_jvsMode;
 }
+
+// Host steering, -1 (full left)...+1 (full right). GetGas/GetBrake: 0...1.
+float ACJV::GetSteer()
+{
+	return std::clamp(m_wheelSteerR - m_wheelSteerL, -1.0f, 1.0f);
+}
+
+float ACJV::GetGas()   { return std::clamp(m_wheelGas,   0.0f, 1.0f); }
+float ACJV::GetBrake() { return std::clamp(m_wheelBrake, 0.0f, 1.0f); }
 
 bool ACJV::IsSindenBorderEnabled()
 {
@@ -429,6 +578,7 @@ void ACJV::SetGameId(const std::string& gameid)
 {
 	s_gameid = gameid;
 	// Clean slate: zero all input state on game switch within the emulator
+	ACUART::ResetBg3State(); // re-arm the BG3 acuart HANDLE handshake so a game RESET boots cleanly (no HANDLE ERROR)
 	m_coin1 = 0;
 	m_coin2 = 0;
 	m_jvsButtonState[0] = 0;
@@ -453,11 +603,23 @@ void ACJV::SetGameId(const std::string& gameid)
 		m_gunMapping = &s_default_gun_mapping;
 
 	auto fit = s_fighting_layouts.find(gameid);
+	auto rit = s_racing_layouts.find(gameid);
 	if (fit != s_fighting_layouts.end())
 	{
 		constexpr const char* layout_names[] = {"tekken", "gundam", "6-button", "soulcalibur", "bloodyroar"};
 		Console.WriteLn("ACJV: fighting layout for %s: %s", gameid.c_str(), layout_names[static_cast<int>(fit->second)]);
 		UpdateFightingBindings(fit->second);
+	}
+	else if (rit != s_racing_layouts.end())
+	{
+		constexpr const char* racing_names[] = {"acedriver3", "bg3", "wangan", "rrv"};
+		Console.WriteLn("ACJV: racing layout for %s: %s", gameid.c_str(), racing_names[static_cast<int>(rit->second)]);
+		UpdateRacingBindings(rit->second);
+	}
+	else
+	{
+		s_active_p1_bindings = s_jvs_p1_button_bindings;
+		s_active_p2_bindings = s_jvs_p2_button_bindings;
 	}
 
 	// TC3 has 3 I/O boards: TSS-I/O (white flash), MIU-I/O (640x224), RAYS PCB (0xFFFF).
@@ -465,6 +627,8 @@ void ACJV::SetGameId(const std::string& gameid)
 	// RAYS PCB calibration uses DMA protocol (cmd 0x70) that bypasses our JVS handler.
 	if (gameid == "NM00012")
 		CurrentBoardID = MIU_IO_JPN_GUN_EXTENTI;
+	else if (gameid == "NM00010" || gameid == "NM00015")
+		CurrentBoardID = TAITO_BG3_IO_PCB; // BG3/BG3T: real Taito K91X0951A board ID (from the F22 EPROM dump)
 	else
 		CurrentBoardID = RAYS_PCB;
 }
@@ -498,6 +662,24 @@ static void UpdateLightgunFromMouse()
 	const auto& gm = ACJV::GetGunMapping();
 	if (gm.sensor)
 		ACJV::SetButtonState(0, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
+}
+
+// Combine host axes into the 3 JVS analog channels (steer/gas/brake). Steering encoding is per-game.
+// (Ridge Racer V uses UpdateFcaFrame instead.)
+static void UpdateWheelChannels()
+{
+	const float steer = std::clamp(m_wheelSteerR - m_wheelSteerL, -1.0f, 1.0f); // -1 full left .. +1 full right
+	const bool isBG3 = (s_gameid == "NM00010" || s_gameid == "NM00015");
+	const bool isWangan = (s_gameid == "NM00008" || s_gameid == "NM00005");
+	if (isBG3)
+		m_jvsWheelChannels[0] = static_cast<u16>(512.0f - steer * 496.0f);                    // BG3: 10-bit, center 512, inverted
+	else if (isWangan)
+		m_jvsWheelChannels[0] = static_cast<u16>(0x8000 + static_cast<int>(steer * 0x7E00));  // Wangan: center 0x8000, +-0x7E00
+	else
+		m_jvsWheelChannels[0] = static_cast<u16>((steer * 0.5f + 0.5f) * 0xFFFF);             // standard JVS: unsigned 16-bit, center 0x8000
+	const float pedalMax = isWangan ? 32767.0f : static_cast<float>(0xFFFF); // Wangan pedals use the 0..0x7FFF half (else they wrap)
+	m_jvsWheelChannels[1] = static_cast<u16>(std::clamp(m_wheelGas,   0.0f, 1.0f) * pedalMax); // accelerator
+	m_jvsWheelChannels[2] = static_cast<u16>(std::clamp(m_wheelBrake, 0.0f, 1.0f) * pedalMax); // brake
 }
 
 void do_jvs_packet(const u8* input, u8* output) {
@@ -578,18 +760,19 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*output++) = JVS_PLAYER_COUNT; //2 players
 			(*output++) = 0x10;             //16 switches
 			(*output++) = 0x00;
-			// TODO: driving games (e.g. Wangan Midnight)
-#if 0
+			// Driving games (Wangan Midnight, MotoGP, ...): 3 analog channels (steer/gas/brake)
 			if(m_jvsMode == JVS_MODE::DRIVE)
 			{
-				(*output++) = 0x03;                  //Analog Input
-				(*output++) = JVS_WHEEL_CHANNEL_MAX; //Channel Count (3 channels)
-				(*output++) = 0x10;                  //Bits (16 bits)
+				// BG3's Taito K91X0951A is an AD8 board (8 analog ch, 10-bit) per its dumped firmware's
+				// JVS feature descriptor @0xfc0fea (03 08 0a 00); other driving boards report 3x 16-bit.
+				const bool isBG3 = (ACJV::CurrentBoardID == TAITO_BG3_IO_PCB);
+				(*output++) = 0x03;                              //Analog Input
+				(*output++) = isBG3 ? 8 : JVS_WHEEL_CHANNEL_MAX; //Channel Count
+				(*output++) = isBG3 ? 0x0A : 0x10;               //Bits
 				(*output++) = 0x00;
 				(*dstSize) += 4;
 			}
 			else
-#endif
 			if(m_jvsMode == JVS_MODE::LIGHTGUN)
 			{
 				(*output++) = 0x06; //Screen Pos Input
@@ -780,10 +963,14 @@ void do_jvs_packet(const u8* input, u8* output) {
 			}
 			else if(m_jvsMode == JVS_MODE::DRIVE)
 			{
-				for(int i = 0; i < JVS_WHEEL_CHANNEL_MAX; i++)
+				UpdateWheelChannels();
+				// Respond with exactly the channel count the game requested (BG3's AD8 board asks for 8,
+				// other driving boards 3). ch0-2 = steer/gas/brake; spare channels report mid-scale.
+				for(int i = 0; i < channel; i++)
 				{
-					(*output++) = static_cast<u8>(m_jvsWheelChannels[i] >> 8);
-					(*output++) = static_cast<u8>(m_jvsWheelChannels[i]);
+					u16 v = (i < JVS_WHEEL_CHANNEL_MAX) ? m_jvsWheelChannels[i] : 0x8000;
+					(*output++) = static_cast<u8>(v >> 8);
+					(*output++) = static_cast<u8>(v);
 				}
 			}
 
@@ -871,13 +1058,19 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 
 // based on https://github.com/search?q=repo%3Ajpd002/Play-%20CSys246%3A%3AProcessJvsPacket&type=code by Jean-Philip Desjardins
+// Prime the JVS board firmware-version register when ACJV starts (BG3 Tuned polls it before any command).
+void ACJV::OnBoardStart() {
+	rdbuf_getu16()[1] = (s_gameid == "NM00015") ? 0x213 : (s_gameid == "NM00010") ? 0x210 : 0x208;
+}
+
 void do_acjv_packet() {
 	const u16* wr16 = wrbuf_getu16();
 	u16* rd16 = rdbuf_getu16();
 	rd16[0] = wr16[0];
 	u16 RootPacketID = wr16[8];
 	if(rd16[0] == 0x3E6F) {
-		rd16[1]      = 0x208;        // unconfirmed: firmware version
+		// JVFIRM version n246Jvio checks against its own (mismatch stalls boot): BG3=0x210, BG3T=0x213, others 0x208.
+		rd16[1]      = (s_gameid == "NM00015") ? 0x213 : (s_gameid == "NM00010") ? 0x210 : 0x208;
 		rd16[0x14]   = RootPacketID; // Xored with value at 0x10 in send packet, needs to be the same
 		rd16[0x21]   = wr16[0x0D];
 		rd16[0x30]  = s_dip_switch_state; // here the game polls the dip switch values?
@@ -890,8 +1083,60 @@ void do_acjv_packet() {
 			}
 			rd16[0x20] = PacketID;
 		}
-		rd16[0x15] = 0x5210;
-		rd16[0x16] = 0x5210;
-		rd16[0x17] = 0x5210;
+		// ac_jvsif root field (0x2A/0x2C/0x2E): a board value the white-screen loader sums to pace a cosmetic bar.
+		// BG3 gets the bar-skip minimum 0x9C40 (instant boot); others keep 0x5210.
+		if (s_gameid == "NM00010" || s_gameid == "NM00015") {
+			rd16[0x15] = 0x9C40;
+			rd16[0x16] = 0x9C40;
+			rd16[0x17] = 0x9C40;
+		} else {
+			rd16[0x15] = 0x5210;
+			rd16[0x16] = 0x5210;
+			rd16[0x17] = 0x5210;
+		}
 	}
+}
+
+// Free-run the FCA-1 input frame for Ridge Racer V in the rdbuf (do_acjv_packet never runs for it).
+// RRV's init waits on the heartbeat @0x0e/0x0f, then reads steering/pedals/buttons. Ticked from DEV9async.
+void ACJV::UpdateFcaFrame()
+{
+	if (s_gameid != "NM00001")
+		return;
+
+	static u16 s_fcaCounter = 0;
+	s_fcaCounter++;                            // FCA-1 heartbeat — unblocks FUN_00229af0 case 1
+	rdbuf[0x0e] = (u8)(s_fcaCounter & 0xff);   // counter: low byte @0x0e, high byte @0x0f
+	rdbuf[0x0f] = (u8)(s_fcaCounter >> 8);
+
+	// FCA-1 raw range (FUN_0022ab70): steer center 0x8000 +-0x6400, pedals 0..0x5800.
+	const float steerf = std::clamp(m_wheelSteerR - m_wheelSteerL, -1.0f, 1.0f);
+	const u16 steerRaw = (u16)(0x8000 + (int)(steerf * 0x6400));
+	rdbuf[0x80] = (u8)(steerRaw & 0xff);
+	rdbuf[0x81] = (u8)(steerRaw >> 8);
+	const u16 gasRaw = (u16)(std::clamp(m_wheelGas, 0.0f, 1.0f) * 0x5800);
+	rdbuf[0x82] = (u8)(gasRaw & 0xff);
+	rdbuf[0x83] = (u8)(gasRaw >> 8);
+	const u16 brakeRaw = (u16)(std::clamp(m_wheelBrake, 0.0f, 1.0f) * 0x5800);
+	rdbuf[0x84] = (u8)(brakeRaw & 0xff);
+	rdbuf[0x85] = (u8)(brakeRaw >> 8);
+
+	// Buttons (FCA-1 digital inputs, active-high; bit assignments RE'd from I/O TEST FUN_0022bba8).
+	const u16 btn = m_jvsButtonState[0];
+	u8 b40 = 0, b41 = 0;
+	if (btn & JVS_BTN_3)       b40 |= 0x80; // R1       -> UP SHIFT (gear up)
+	if (btn & JVS_BTN_4)       b40 |= 0x40; // L1       -> DOWN SHIFT (gear down)
+	if (btn & JVS_BTN_2)       b41 |= 0x01; // Triangle -> VIEW CHANGE
+	if (btn & (JVS_BTN_START|JVS_BTN_1)) b41 |= 0x02; // Start / Square -> ENTER (confirm/start)
+	if (btn & JVS_BTN_UP)      b41 |= 0x20; // DPad Up   -> UP SELECT
+	if (btn & JVS_BTN_DOWN)    b41 |= 0x10; // DPad Down -> DOWN SELECT
+	if (btn & JVS_BTN_SERVICE) b41 |= 0x40; // Select   -> SERVICE (adds a service credit)
+	rdbuf[0x40] = b40;
+	rdbuf[0x41] = b41;
+
+	// TEST switch (rdbuf[0xe2] b7): RRV's FCA path bypasses the standard DIP register, so feed Test Mode here.
+	rdbuf[0xe2] = (s_dip_switch_state & TESTMODE) ? 0x80 : 0;
+
+	// COIN: FCA-1 coin counter @rdbuf[0xc0]; RRV credits on increase (FUN_0022aa88). Mirror our coin count.
+	rdbuf[0xc0] = (u8)m_coin1;
 }

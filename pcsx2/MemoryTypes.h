@@ -30,7 +30,7 @@ namespace Ps2MemSize
 // sizes for SYSTEM2x6 namco board components
 namespace NamcoMemSize
 {
-	static constexpr u32 ACRAM = _64mb; // can be 0, 32 or 64mb depending on wich system2x6. use largest for simplicity
+	static constexpr u32 ACRAM = _64mb * 2; // largest System2x6 ACRAM (128MB): Wangan's RAM expansion; allocate the max
 	static constexpr u32 ACSRAM = _32kb; // Settings Static memory. always 32kb. used for game settings
 }
 

@@ -32,7 +32,8 @@ enum BOARDID {
 	FCA_1_JPN_MULTIPURPOSE,
 	FCB_JPN_TOUCHPANEL,
 	TSS_GUN_EXTENTION,
-	MIU_IO_JPN_GUN_EXTENTI
+	MIU_IO_JPN_GUN_EXTENTI,
+	TAITO_BG3_IO_PCB
 };
 
 enum class JVS_MODE {
@@ -51,6 +52,13 @@ enum class FightingLayout {
 	SIX_BUTTON, // Sw1-6:     Square, Triangle, L1, Cross, Circle, R1 — JAM
 	SOULCAL,    // Sw1,2,3,4: Square, Triangle, Circle, Cross         — SC2, SC3, KN1, KN2, BAX, FUD
 	BLOODYROAR, // Sw1,2,3,4: Square, Cross, Circle, Triangle         — BR3
+};
+
+enum class RacingLayout {
+	ACEDRIVER3, // NM00047: GEAR UP=Sw3(L1), GEAR DOWN=Sw4(R1), VIEW CHANGE=Push9(Triangle), ENTER=Sw1
+	BG3,        // NM00010/15: SHIFT UP=R1, SHIFT DOWN=L1, VIEW=Triangle, SIDEBRAKE=Square, HAZARD=Circle
+	WANGAN,     // NM00008/05: SHIFT UP=R1, SHIFT DOWN=L1, SELECT=D-pad, SERVICE=Select
+	RRV,        // NM00001: SHIFT UP=R1, SHIFT DOWN=L1, VIEW=Triangle, ENTER=Square, SELECT=D-pad, SERVICE=Select
 };
 
 #define JVS_WHEEL_CHANNEL_MAX 3
@@ -87,6 +95,8 @@ namespace ACJV {
 
     u16 Read16(u32 addr);
     void Write16(u32 addr, u16 val);
+    void UpdateFcaFrame(); // Ridge Racer V: refresh the FCA-1 I/O board's input buffer every frame (steering/pedals/buttons)
+    void OnBoardStart();   // set the JVS I/O board firmware version at power-on (Battle Gear 3 Tuned reads it before its first command)
     extern enum BOARDID CurrentBoardID;
 
     std::span<const DIPSwitchInfo> GetDIPSwitches();
@@ -98,7 +108,12 @@ namespace ACJV {
     std::span<const InputBindingInfo> GetButtonBindings();
     std::span<const InputBindingInfo> GetP2ButtonBindings();
     std::span<const InputBindingInfo> GetCoinBindings();
+    std::span<const InputBindingInfo> GetWheelBindings();
     void SetButtonState(u32 player, u16 mask, bool pressed);
+    void SetWheelAxis(u32 axis, float value);
+    float GetSteer(); // host steering, -1 (full left)...+1 (full right); used by the BG3 drive-board responder (acuart)
+    float GetGas();   // host accelerator, 0...1
+    float GetBrake(); // host brake, 0...1
     void InsertCoin(u32 slot);
 
     bool GetDIPSwitchState(u32 index);
@@ -187,6 +202,7 @@ enum JVSButton : u16 {
     JVS_BTN_4       = 0x4000,
     JVS_BTN_5       = 0x2000,
     JVS_BTN_6       = 0x1000,
+    JVS_BTN_9       = 0x0200, // Ace Driver 3 wires VIEW CHANGE to Push9.
 };
 
 

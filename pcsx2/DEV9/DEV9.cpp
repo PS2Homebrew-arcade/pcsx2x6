@@ -8,6 +8,8 @@
 #include "IopDma.h"
 #include "ACATA.h"
 #include "ACCORE.h"
+#include "ACUART.h"
+#include "ACJV.h"
 #include "ACRAM.h"
 #include "IopHw.h"
 
@@ -1172,6 +1174,8 @@ void DEV9async(u32 cycles)
 {
 	smap_async(cycles);
 	dev9.ata->Async(cycles);
+	ACUART::StreamV257(cycles); // Ridge Racer V self-test: stream the V257 drive-board status...
+	ACJV::UpdateFcaFrame();     // ...and free-run the FCA-1 input frame
 }
 
 void DEV9CheckChanges(const Pcsx2Config& old_config)

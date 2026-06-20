@@ -388,6 +388,10 @@ void ACATA::handle_cmd(u16 val) {
         ACCORE::intr(ACCORE::INTRN_ATA);
     break;
     case ATA_C_INITIALIZE_DEVICE_PARAMETERS:
+        // Need to rework this hack.
+        // BG3: 0x91 completes immediately, so mark the device idle (-1); else cmd_handled stays 0 and the BUSY
+        // probe-hack wedges it on -> HDD driver hangs (black screen).
+        ACATA::cmd_handled = -1;
         CLRB(R_STATUS, ATA_STAT_ERR);
         CLRB(R_STATUS, ATA_STAT_BUSY);
         R_STATUS |= ATA_STAT_READY;

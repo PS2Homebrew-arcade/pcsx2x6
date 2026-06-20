@@ -26,9 +26,9 @@
 
 #define ACRAM_ADDR_BASE   0x14000000
 #define ACRAM_RANGE       0x1400
-#define ACRAM_MAX_SIZE    _64mb
+#define ACRAM_MAX_SIZE    (_64mb * 2)
 #define ACRAM_BANK_SIZE   0x2000000  // 32MB per bank
-#define ACRAM_NUM_BANKS   2
+#define ACRAM_NUM_BANKS   4          // most games use 1 bank; TK4 needs 2, Wangan 4 (its RAM expansion). Use the max.
 #define ACRAM_REG_READ    0x60000
 #define ACRAM_REG_WRITE   0x70000
 #define ACRAM_REG_MASK    0x1FFFFF   // isolate register offset within bank

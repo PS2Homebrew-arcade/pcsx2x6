@@ -24,12 +24,11 @@ u16 ACRAM::Read16(u32 addr) {
     return 0;
 }
 
-// Per-bank pointer tracking: real ACRAM has 2 independent banks with separate DMA controllers.
-// Without this, bank 1 writes (streaming) overwrite bank 0 pointers (disc cache), corrupting
-// the source table and hanging the game at load. Ref: ps2sdk acram/src/ram.c
+// Track DMA pointers per bank (ACRAM_NUM_BANKS): without this, one bank's streaming writes clobber
+// another bank's data/pointers and the game hangs at load. Ref: ps2sdk acram/src/ram.c
 void ACRAM::Write16(u32 addr, u16 val) {
     u32 offset = addr - ACRAM_ADDR_BASE;
-    int bank = (offset >> 21) & 1; // bit 21 selects bank: 64MB = 2x32MB (e.g. TK4: bank0=disc cache, bank1=streaming)
+    int bank = (offset >> 21) & (ACRAM_NUM_BANKS - 1); // address bits 21+ pick the bank
     u32 reg = offset & ACRAM_REG_MASK;
     u32 bank_base = bank * ACRAM_BANK_SIZE;
 
@@ -56,8 +55,8 @@ void ACRAM::Write16(u32 addr, u16 val) {
         OOB_REPORT(addr);
 }
 
-int ACRAM::BankFromDmaTarget(u32 dma_target) { // same bit 21 bank select as Write16
-    return ((dma_target - ACRAM_ADDR_BASE) >> 21) & 1;
+int ACRAM::BankFromDmaTarget(u32 dma_target) { // same bank select as Write16
+    return ((dma_target - ACRAM_ADDR_BASE) >> 21) & (ACRAM_NUM_BANKS - 1);
 }
 
 void ACRAM::DmaRead(u32* iop_buf, u32 size_bytes, int bank) {

@@ -4,6 +4,15 @@ NM00001:
   bootprog: START
   media: CD
   input: driving
+  clampModes:
+    vuClampMode: 2
+  gsHWFixes:
+    textureInsideRT: 1
+    halfPixelOffset: 2
+    roundSprite: 1
+    gpuPaletteConversion: 2
+    cpuSpriteRenderBW: 1
+    cpuSpriteRenderLevel: 1
 NM00002:
   name: Bloody Roar 3
   region: System246
@@ -66,6 +75,9 @@ NM00010:
   bootprog: BGRLOAD
   media: HDD
   input: driving
+  clampModes:
+    eeClampMode: 3
+    vuClampMode: 3
 NM00011:
   name: Pride GP 2003
   region: System246
@@ -96,6 +108,9 @@ NM00015:
   bootprog: BGTLOAD
   media: HDD
   input: driving
+  clampModes:
+    eeClampMode: 3
+    vuClampMode: 3
 NM00016:
   name: Zoids Infinity
   region: System246

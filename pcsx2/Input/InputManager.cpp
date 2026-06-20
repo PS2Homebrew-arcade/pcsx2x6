@@ -960,6 +960,45 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 				ACJV::InsertCoin(slot);
 		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
+
+	// driving analog axes (steer/gas/brake) -> JVS wheel channels, mirroring the button bindings above
+	for (const InputBindingInfo& bi : ACJV::GetWheelBindings())
+	{
+		const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, bi.name));
+		if (bindings.empty())
+			continue;
+
+		AddBindings(bindings, InputAxisEventHandler{[axis = static_cast<u32>(bi.bind_index)](InputBindingKey key, float value) {
+			ACJV::SetWheelAxis(axis, value);
+		}}, bi.bind_type, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
+	}
+
+	if (const Pad::ControllerInfo* pad_ci = Pad::GetControllerInfo(EmuConfig.Pad.Ports[0].Type))
+	{
+		const std::string pad_section = Pad::GetConfigSection(0);
+		// apply Port 1's deadzone to the auto-mirrored wheel (the JVS path skips the pad's own, so a worn stick drifts)
+		const float stick_deadzone = si.GetFloatValue(pad_section.c_str(), "Deadzone", Pad::DEFAULT_STICK_DEADZONE);
+		const float trig_deadzone = si.GetFloatValue(pad_section.c_str(), "ButtonDeadzone", Pad::DEFAULT_BUTTON_DEADZONE);
+		for (const InputBindingInfo& jvs_bi : ACJV::GetWheelBindings())
+		{
+			for (const InputBindingInfo& pad_bi : pad_ci->bindings)
+			{
+				if (pad_bi.generic_mapping != jvs_bi.generic_mapping)
+					continue;
+
+				// steering (axes 0/1) uses the analog deadzone; gas/brake (2/3) the trigger deadzone
+				const float deadzone = (jvs_bi.bind_index <= 1) ? stick_deadzone : trig_deadzone;
+				const std::vector<std::string> pad_bindings(si.GetStringList(pad_section.c_str(), pad_bi.name));
+				for (const std::string& pb : pad_bindings)
+				{
+					AddBinding(pb, InputAxisEventHandler{[axis = static_cast<u32>(jvs_bi.bind_index), deadzone](InputBindingKey key, float value) {
+						ACJV::SetWheelAxis(axis, ApplySingleBindingScale(1.0f, deadzone, value));
+					}});
+				}
+				break;
+			}
+		}
+	}
 }
 
 void InputManager::AddPadBindings(SettingsInterface& si, u32 pad_index, bool is_profile)

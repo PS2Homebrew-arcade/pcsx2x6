@@ -29,7 +29,8 @@ namespace ACCORE {
 		INTRN_LAST = 0x2,
 	};
 	enum INTC_CAUS {
-		CAUS_ATA = 0x8000
+		CAUS_ATA = 0x8000,
+		CAUS_UART = 0x4000 // UART receive interrupt (drive-board serial link)
 	};
 }
 
