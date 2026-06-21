@@ -33,7 +33,7 @@ static bool s_bg3HandleDone = false; // false during the boot HANDLE handshake, 
 
 static std::deque<u8> s_v257RxFifo;                   // bytes Ridge Racer V reads back from its drive board
 static u32 s_v257Accum = 0;                           // throttles the periodic refill
-static constexpr u8 V257_STATUS[3] = {'E', '0', '0'}; // "E00" = no error; RRV won't boot until it reads this
+static constexpr u8 V257_STATUS[3] = {'C', '0', '1'}; // drive-board OK status; accepted by every RRV build
 
 u16 ACUART::Read16(u32 addr) {
 	const u32 reg = addr & 0xFFF;
@@ -151,7 +151,7 @@ void ACUART::ResetBg3State()
 }
 
 // Ridge Racer V drive-board status streamer (called each DEV9 tick): refill the receive buffer with the
-// board's status ("E00", or "C01" once FFB is on) and raise the RX interrupt. Only RRV needs this.
+// board's OK status and raise the RX interrupt. Only RRV needs this.
 void ACUART::StreamV257(u32 cycles)
 {
 	const std::string& gid2 = ACJV::GetGameId();
@@ -170,12 +170,6 @@ void ACUART::StreamV257(u32 cycles)
 	s_v257Accum = 0;
 	// Keep raising the RX IRQ every tick; reload the status only once the ISR has drained the previous copy.
 	if (s_v257RxFifo.empty())
-	{
-		// "E00" = no error; switch to "C01" once the FFB motor is on (EE 0x1f0d008), else MOTOR ERROR 20 after ~30s.
-		static constexpr u8 V257_C01[3] = {'C', '0', '1'};
-		const u8* mm = eeMem ? eeMem->Main : nullptr;
-		const u8* st = (mm && mm[0x01f0d008] >= 1) ? V257_C01 : V257_STATUS;
-		s_v257RxFifo.assign(st, st + 3);
-	}
+		s_v257RxFifo.assign(V257_STATUS, V257_STATUS + 3);
 	ACCORE::intr(ACCORE::INTRN_UART); // raise the UART RX interrupt
 }
