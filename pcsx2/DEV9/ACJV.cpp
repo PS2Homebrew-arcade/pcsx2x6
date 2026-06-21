@@ -1074,12 +1074,19 @@ void do_acjv_packet() {
 		rd16[0x14]   = RootPacketID; // Xored with value at 0x10 in send packet, needs to be the same
 		rd16[0x21]   = wr16[0x0D];
 		rd16[0x30]  = s_dip_switch_state; // here the game polls the dip switch values?
+		static u8 s_acFrameSeq = 0;
+		rdbuf[0x57] = ++s_acFrameSeq; // game waits on this byte advancing each frame to finalize a coin decrement
 		u16 PacketID = wr16[0x0C];
 		if(PacketID != 0) {
 			if(wrbuf[0x122] == JVS_SYNC) {
 				do_jvs_packet(&wrbuf[0x122], &rdbuf[0x15A]);
 			} else {
 				do_jvs_packet(&wrbuf[0x22],  &rdbuf[0x5A]);
+			}
+			static u16 s_lastCoinPkt = 0xFFFF; // coin DECREASE rides in a 2nd JVS packet (slot 0x22); service it once per poll
+			if(wrbuf[0x122] == JVS_SYNC && wrbuf[0x22] == JVS_SYNC && wrbuf[0x23] != 0x00 && PacketID != s_lastCoinPkt) {
+				do_jvs_packet(&wrbuf[0x22], &rdbuf[0x5A]);
+				s_lastCoinPkt = PacketID;
 			}
 			rd16[0x20] = PacketID;
 		}
