@@ -874,6 +874,14 @@ set(pcsx2InputHeaders
 	Input/SDLInputSource.h
 )
 
+set(pcsx2OutputsSources
+	Outputs/Outputs.cpp
+)
+set(pcsx2OutputsHeaders
+	Outputs/Outputs.h
+	Outputs/Types.h
+)
+
 if(APPLE)
 	list(APPEND pcsx2GSSources
 		GS/Renderers/Metal/GSDeviceMTL.mm
@@ -903,6 +911,15 @@ if(WIN32)
 	list(APPEND pcsx2InputHeaders
 		Input/DInputSource.h
 		Input/XInputSource.h
+	)
+endif()
+
+if(WIN32)
+	list(APPEND pcsx2OutputsSources
+		Outputs/WinOutputs.cpp
+	)
+	list(APPEND pcsx2OutputsHeaders
+		Outputs/WinOutputs.h
 	)
 endif()
 
@@ -1119,6 +1136,7 @@ target_sources(PCSX2 PRIVATE
 	${pcsx2ImGuiSources}
 	${pcsx2ImGuiHeaders}
 	${pcsx2InputSources}
+	${pcsx2OutputsSources}
 	${pcsx2InputHeaders}
 	${pcsx2ps2Sources}
 	${pcsx2ps2Headers}

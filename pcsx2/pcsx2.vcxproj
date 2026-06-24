@@ -291,6 +291,8 @@
     <ClCompile Include="Input\XInputSource.cpp" />
     <ClCompile Include="IopGte.cpp" />
     <ClCompile Include="LayeredSettingsInterface.cpp" />
+    <ClCompile Include="Outputs\Outputs.cpp" />
+    <ClCompile Include="Outputs\WinOutputs.cpp" />
     <ClCompile Include="PINE.cpp" />
     <ClCompile Include="FW.cpp" />
     <ClCompile Include="PerformanceMetrics.cpp" />
@@ -738,6 +740,9 @@
     <ClInclude Include="IopGte.h" />
     <ClInclude Include="IPU\mpeg2_vlc.h" />
     <ClInclude Include="LayeredSettingsInterface.h" />
+    <ClInclude Include="Outputs\Outputs.h" />
+    <ClInclude Include="Outputs\Types.h" />
+    <ClInclude Include="Outputs\WinOutputs.h" />
     <ClInclude Include="PINE.h" />
     <ClInclude Include="FW.h" />
     <ClInclude Include="PerformanceMetrics.h" />
