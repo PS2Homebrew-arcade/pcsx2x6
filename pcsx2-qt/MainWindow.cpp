@@ -41,6 +41,8 @@
 #include "pcsx2/SaveState.h"
 #include "pcsx2/SIO/Sio.h"
 #include "pcsx2/GS/GSExtra.h"
+#include "pcsx2/INISettingsInterface.h"
+#include "pcsx2/VMManager.h"
 
 #include "common/Assertions.h"
 #include "common/CocoaTools.h"
@@ -1588,6 +1590,12 @@ void MainWindow::onGameListEntryContextMenuRequested(const QPoint& point)
 		action = menu.addAction(tr("Set Cover Image..."));
 		connect(action, &QAction::triggered, [this, entry]() { setGameListEntryCoverImage(*entry); });
 
+		action = menu.addAction(tr("Set Bezel Image..."));
+		connect(action, &QAction::triggered, [this, entry]() { setGameListEntryBezelImage(*entry); });
+
+		action = menu.addAction(tr("Clear Bezel Image"));
+		connect(action, &QAction::triggered, [this, entry]() { clearGameListEntryBezelImage(*entry); });
+
 #if !defined(__APPLE__)
 		connect(menu.addAction(tr("Create Game Shortcut...")), &QAction::triggered, [this]() { MainWindow::onCreateGameShortcutTriggered(); });
 #endif
@@ -3119,6 +3127,51 @@ void MainWindow::setGameListEntryCoverImage(const GameList::Entry& entry)
 	}
 
 	m_game_list_widget->refreshGridCovers();
+}
+
+void MainWindow::setGameListEntryBezelImage(const GameList::Entry& entry)
+{
+	const QString filename = QDir::toNativeSeparators(QFileDialog::getOpenFileName(
+		this, tr("Select Bezel Image"), QString(), tr("Image Files (*.png *.jpg *.jpeg *.webp *.bmp)")));
+
+	if (filename.isEmpty())
+		return;
+
+	std::string_view game_serial;
+	if (entry.type != GameList::EntryType::ELF)
+		game_serial = entry.serial;
+
+	const std::string settings_path = VMManager::GetGameSettingsPath(game_serial, entry.crc);
+
+	INISettingsInterface sif(settings_path);
+	if (FileSystem::FileExists(sif.GetFileName().c_str()))
+		sif.Load();
+
+	const QByteArray utf8 = filename.toUtf8();
+	sif.SetStringValue("EmuCore/GS", "BezelPath", utf8.constData());
+	sif.SetBoolValue("EmuCore/GS", "BezelEnabled", true);
+	sif.Save();
+
+	g_emu_thread->reloadGameSettings();
+}
+
+void MainWindow::clearGameListEntryBezelImage(const GameList::Entry& entry)
+{
+	std::string_view game_serial;
+	if (entry.type != GameList::EntryType::ELF)
+		game_serial = entry.serial;
+
+	const std::string settings_path = VMManager::GetGameSettingsPath(game_serial, entry.crc);
+
+	INISettingsInterface sif(settings_path);
+	if (FileSystem::FileExists(sif.GetFileName().c_str()))
+		sif.Load();
+
+	sif.DeleteValue("EmuCore/GS", "BezelPath");
+	sif.DeleteValue("EmuCore/GS", "BezelEnabled");
+	sif.Save();
+
+	g_emu_thread->reloadGameSettings();
 }
 
 void MainWindow::clearGameListEntryPlayTime(const GameList::Entry& entry, const time_t entry_played_time)
