@@ -20,17 +20,17 @@ NM00002:
   media: CD
   input: button
 NM00003:
+  name: Vampire Night
+  region: System246
+  bootprog: VPNGAME
+  media: CD
+  input: lightgun
+NM10003:
   name: Technic Beat
   region: System246
   bootprog: VPNGAME
   media: DVD
   input: button
-#NM00003:
-#  name: Vampire Night
-#  region: System246
-#  bootprog: VPNGAME
-#  media: CD
-#  input: lightgun
 NM00004:
   name: Tekken 4
   region: System246
