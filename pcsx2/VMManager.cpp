@@ -3189,14 +3189,7 @@ ImGuiManager::BezelFitMode VMManager::ConvertBezelFitMode(GSBezelFitMode mode)
 
 void VMManager::UpdateBezelOverlay()
 {
-	Console.WriteLn("Bezel: UpdateBezelOverlay enabled=%s path='%s' opacity=%f scale=%d fit=%d fullscreen=%s bigpicture=%s",
-		EmuConfig.GS.BezelEnabled ? "true" : "false",
-		EmuConfig.GS.BezelPath.c_str(),
-		EmuConfig.GS.BezelOpacity,
-		EmuConfig.GS.BezelScale,
-		static_cast<int>(EmuConfig.GS.BezelFitMode),
-		EmuConfig.GS.BezelShowInFullscreen ? "true" : "false",
-		EmuConfig.GS.BezelShowInBigPicture ? "true" : "false");
+	Console.WriteLn("Bezel: UpdateBezelOverlay");
 
 	ImGuiManager::SetBezelOverlay(
 		EmuConfig.GS.BezelEnabled,
