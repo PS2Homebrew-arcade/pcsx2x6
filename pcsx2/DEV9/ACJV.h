@@ -49,24 +49,30 @@ enum class JVS_MODE {
 
 // Sw -> pad order per layout, mirroring each game's official PS2 port.
 enum class FightingLayout {
-	TEKKEN,     // Sw1,2,4,5: Square, Triangle, Cross, Circle         — TK4, TK5, TK5DR, SDBZ, PrideGP
-	GUNDAM,     // Sw1,2,3,4: Square, Triangle, Cross, Circle         — YuYu + Gundam VS (zgundm/dx, SEED/Dest, GvG/NEXT)
+	TEKKEN,     // Sw1,2,4,5: Square, Triangle, Cross, Circle         — TK4, TK5, TK5DR
+	GUNDAM,     // Sw1,2,3,4: Square, Triangle, Cross, Circle         — Gundam VS (zgundm/dx, SEED/Dest, GvG/NEXT)
 	SIX_BUTTON, // Sw1-6:     Square, Triangle, L1, Cross, Circle, R1 — JAM
-	SOULCAL,    // Sw1,2,3,4: Square, Triangle, Circle, Cross         — SC2, SC3, KN1, KN2, BAX, FUD
+	SOULCAL,    // Sw1,2,3,4: Square, Triangle, Circle, Cross         — SC2, SC3
 	BLOODYROAR, // Sw1,2,3,4: Square, Cross, Circle, Triangle         — BR3
+	// Per-game splits: same scheme as the parent franchise, own config keys so each maps independently.
+	FATE,       // NM00048: Fate Unlimited Codes (Weak/Medium/Strong + Reflect Guard)
+	KINNIKUMAN, // NM00029/40: Kinnikuman MGP 1 & 2 (Left/Right Fist, Special, Guard)
+	PRIDEGP,    // NM00011: Pride GP 2003 (Left/Right Punch + Kick, limb-based)
+	BASARA,     // NM00042: Sengoku Basara X (Weak/Medium/Strong + Striker)
+	SDBZ,       // NM00027: Super Dragon Ball Z (Light/Heavy Attack, Jump, Block)
+	YUYU,       // NM00035: YuYu Hakusho Deathmatch (versus, 3 buttons: Punch/Kick/Guard)
 };
 
 enum class RacingLayout {
-	ACEDRIVER3, // NM00047: GEAR UP=Sw3(L1), GEAR DOWN=Sw4(R1), VIEW CHANGE=Push9(Triangle), ENTER=Sw1
-	BG3,        // NM00010/15: SHIFT UP=R1, SHIFT DOWN=L1, VIEW=Triangle, SIDEBRAKE=Square, HAZARD=Circle
-	WANGAN,     // NM00008/05: SHIFT UP=R1, SHIFT DOWN=L1, SELECT=D-pad, SERVICE=Select
-	RRV,        // NM00001: SHIFT UP=R1, SHIFT DOWN=L1, VIEW=Triangle, ENTER=Square, SELECT=D-pad, SERVICE=Select
+	UNIVERSAL,  // Wangan/RRV/MotoGP/Ace Driver 3 (View = Sw2|Push9)
+	BG3,        // NM00010/15: D-pad-wired + Sidebrake + Hazard (Taito board)
 };
 
 enum class StandardLayout {
 	BASEBALL,    // NM00009: Netchu Pro Baseball (Sw1-6 superset)
 	SMASHCOURT,  // NM00006: Smash Court Pro (2 buttons)
-	TECHNICBEAT, // NM00003: Technic Beat (3 buttons)
+	TECHNICBEAT, // NM10003: Technic Beat (3 buttons)
+	GUNDAMQUIZ,  // NM00030: Gundam Quiz Warrior (4-button Gundam wiring)
 };
 
 #define JVS_WHEEL_CHANNEL_MAX 3
@@ -86,6 +92,7 @@ namespace ACJV {
     enum : u32
     {
         NUM_DIP_SWITCHES = 4,
+        NUM_JVS_MACROS = 8,
     };
 
     static constexpr const char* CONFIG_SECTION = "JVS";
@@ -118,7 +125,23 @@ namespace ACJV {
     std::span<const InputBindingInfo> GetCoinBindings();
     std::span<const InputBindingInfo> GetWheelBindings();
     std::span<const InputBindingInfo> GetDrumBindings();
+    std::span<const InputBindingInfo> GetTwinstickBindings(); // Zoids
+    std::span<const InputBindingInfo> GetFightingButtons(); // empty if none
+    struct LayoutInfo { const char* name; std::span<const InputBindingInfo> buttons; bool one_player; const char* note = nullptr; }; // Fighting/Standard share this; note = optional hint under the buttons
+    std::span<const LayoutInfo> GetFightingLayouts();
+    std::span<const InputBindingInfo> GetStandardButtons(); // empty if none
+    std::span<const LayoutInfo> GetStandardLayouts();
+    std::span<const InputBindingInfo> GetRacingButtons(); // empty if none
+    struct RacingLayoutInfo { const char* name; std::span<const InputBindingInfo> buttons; };
+    std::span<const RacingLayoutInfo> GetRacingLayouts();
+    struct JvsMacroSwitch { const char* name; const char* label; u16 bit; };
+    std::span<const JvsMacroSwitch> GetMacroSwitches(); // fixed JVS switches a macro can fire (game-independent)
+    std::string LayoutKey(std::span<const InputBindingInfo> buttons); // stable per-layout config key (button-name prefix)
+    std::string GetCurrentLayoutKey();                  // running game's layout key, or empty
+    std::string MacroConfigKey(const std::string& layoutKey, u32 player, u32 index, const char* suffix);
     void SetButtonState(u32 player, u16 mask, bool pressed);
+    void SetMacroState(u32 player, u32 index, bool active); // JVS input macro trigger: fire its switch set for the player
+    void SetMacroMask(u32 player, u32 index, u16 mask);     // set a macro's combined switch mask (pushed by InputManager)
     void SetWheelAxis(u32 axis, float value);
     void SetDrumHit(u32 channel, bool pressed); // Taiko drum sensor -> JVS analog channel (0=off, else above DAI threshold)
     float GetSteer(); // host steering, -1 (full left)...+1 (full right); used by the BG3 drive-board responder (acuart)
@@ -138,7 +161,10 @@ namespace ACJV {
     BOARDID GetCurrentBoardID();
     void SetMode(JVS_MODE mode);
     JVS_MODE GetMode();
+    JVS_MODE ResolveModeFromGameId(const std::string& gameid); // device mode from the gameid alone; jvsmode= is an optional override
     void SetScreenPos(u16 x, u16 y);
+    void SetGunAimSource(u32 player, bool joystick);        // lightgun aim source: false = shared mouse, true = player's stick
+    void SetGunRelativeAim(u32 player, float dx, float dy); // player's stick-driven screen position from the GunCon2 (display coords)
     void SetGameId(const std::string& gameid);
     const std::string& GetGameId();
     const GunMapping& GetGunMapping();
