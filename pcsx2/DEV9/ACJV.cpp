@@ -1233,7 +1233,16 @@ void ACJV::threadMemoryOutputs()
 				{
 					u32 ammoCount = 0;
 
-					ammoCount = memRead32(0x59AE98);
+					u32 romVersion = memRead32(0x590930);
+
+					if (romVersion == 0x3A643225) // CBR1
+					{
+						ammoCount = memRead32(0x59B098);
+					}
+					else // CBR2
+					{
+						ammoCount = memRead32(0x59AE98);
+					}
 
 					if (ammoCount < s_p1LastAmmo)
 					{
