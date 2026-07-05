@@ -540,6 +540,27 @@ public:
 	uint GetDataSize() const override { return Ps2MemSize::ExposedIopRam; }
 };
 
+class SavestateEntry_ACRAM final : public MemorySavestateEntry
+{
+public:
+	~SavestateEntry_ACRAM() override = default;
+
+	const char* GetFilename() const override { return "ACRAM.bin"; }
+	u8* GetDataPtr() const override { return iopMem->ACRAM; }
+	uint GetDataSize() const override { return NamcoMemSize::ACRAM; }
+};
+
+#include "DEV9/ACSRAM.h"
+class SavestateEntry_ACSRAM final : public MemorySavestateEntry
+{
+public:
+	~SavestateEntry_ACSRAM() override = default;
+
+	const char* GetFilename() const override { return "ACSRAM.bin"; }
+	u8* GetDataPtr() const override { return ACSRAM::buffer; }
+	uint GetDataSize() const override { return ACSRAM_MAX_SIZE; }
+};
+
 class SavestateEntry_HwRegs final : public MemorySavestateEntry
 {
 public:
@@ -696,6 +717,8 @@ class SaveStateEntry_Achievements final : public BaseSavestateEntry
 static const std::unique_ptr<BaseSavestateEntry> SavestateEntries[] = {
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_EmotionMemory),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_IopMemory),
+	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_ACRAM),
+	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_ACSRAM),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_HwRegs),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_IopHwRegs),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_Scratchpad),
