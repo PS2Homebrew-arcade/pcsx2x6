@@ -336,7 +336,7 @@ void memLoadingState::FreezeMem( void* data, int size )
 	std::memcpy(data, src, size);
 }
 
-static const char* EntryFilename_StateVersion = "PCSX2 Savestate Version.id";
+static const char* EntryFilename_StateVersion = "PCSX2x6 Savestate Version.id";
 static const char* EntryFilename_Screenshot = "Screenshot.png";
 static const char* EntryFilename_InternalStructures = "PCSX2 Internal Structures.dat";
 static constexpr u32 STATE_PCSX2_VERSION_SIZE = 32;
