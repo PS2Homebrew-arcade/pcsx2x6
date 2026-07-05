@@ -498,6 +498,15 @@ namespace usb_lightgun
 		return nullptr;
 	}
 
+	// Send where the player is aiming (with a stick, not a mouse) to the arcade lightgun.
+	static void ForwardRelativeAimToJVS(GunCon2State* s)
+	{
+		const auto& [wx, wy] = s->GetAbsolutePositionFromRelativeAxes();
+		float dx, dy;
+		GSTranslateWindowToDisplayCoordinates(wx, wy, &dx, &dy);
+		ACJV::SetGunRelativeAim(s->port, dx, dy);
+	}
+
 	void GunCon2Device::UpdateSettings(USBDevice* dev, SettingsInterface& si) const
 	{
 		GunCon2State* s = USB_CONTAINER_OF(dev, GunCon2State, dev);
@@ -537,6 +546,12 @@ namespace usb_lightgun
 			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeUp") ||
 			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeDown"));
 
+		// Arcade aim goes through ACJV; the Aim Device is either the mouse (Pointer-N) or a controller stick.
+		const bool joystick_aim = !pointer_binding.empty() && !StringUtil::StartsWithNoCase(pointer_binding, "Pointer-");
+		ACJV::SetGunAimSource(s->port, joystick_aim);
+		if (joystick_aim)
+			ForwardRelativeAimToJVS(s);
+
 		const s32 new_pointer_index = s->GetSoftwarePointerIndex();
 
 		const bool cursor_changed =
@@ -547,7 +562,9 @@ namespace usb_lightgun
 
 		if (cursor_changed)
 		{
-			if (prev_pointer_index != new_pointer_index)
+			// Only clear a gun's own dedicated slot; slot 0 is the shared mouse pointer (another player/gun
+			// may be aiming with it), so switching this gun off it must not yank slot 0 out from under them.
+			if (prev_pointer_index != new_pointer_index && prev_pointer_index >= static_cast<s32>(InputManager::MAX_POINTER_DEVICES))
 				ImGuiManager::ClearSoftwareCursor(prev_pointer_index);
 
 			const bool had_software_cursor = !s->cursor_path.empty();
@@ -640,6 +657,8 @@ namespace usb_lightgun
 			{
 				s->relative_pos[rel_index] = value;
 				s->UpdateSoftwarePointerPosition();
+				if (ACJV::enabled)
+					ForwardRelativeAimToJVS(s);
 			}
 		}
 	}

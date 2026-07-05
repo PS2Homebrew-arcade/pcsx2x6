@@ -732,6 +732,10 @@ bool VMManager::HasAnyBindingsForPad(const SettingsInterface& si, u32 port)
 
 void VMManager::WarnAboutUnconfiguredController()
 {
+	// Arcade input is over JVS, so skip the "no controller bindings configured" warning for arcade games.
+	if (!s_acgame.empty())
+		return;
+
 	std::unique_lock<std::mutex> lock = Host::GetSettingsLock();
 	SettingsInterface* si = Host::GetSettingsInterface();
 	if (!si || HasAnyBindingsForPad(*si, 0))
@@ -1401,46 +1405,28 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf"));
 				EmuConfig.CurrentGameArgs = INI.GetStringValue("data", "args");
 				ACSRAM::filepath = Path::Combine(basedir, INI.GetStringValue("data", "sram", "sram.bin"));
+				// JVS device mode: an explicit jvsmode= in the .acgame overrides (force/legacy); otherwise it is
+				// derived from the gameid alone (ACJV::ResolveModeFromGameId), so a .acgame needs only its gameid.
 				std::string jvsmode = INI.GetStringValue("data", "jvsmode", "");
-				if (jvsmode == "lightgun")
-				{
-					Host::SetBaseStringSettingValue("USB1", "Type", "guncon2");
-					Host::SetBaseStringSettingValue("USB2", "Type", "guncon2");
-					ACJV::SetMode(JVS_MODE::LIGHTGUN);
-					Console.WriteLn(Color_Green, "ACGAME: jvsmode=lightgun -> GunCon2 on USB1+USB2");
-				}
-				else
-				{
-					Host::SetBaseStringSettingValue("USB1", "Type", "None");
-					Host::SetBaseStringSettingValue("USB2", "Type", "None");
-					if (jvsmode == "fighting")
-					{
-						ACJV::SetMode(JVS_MODE::FIGHTING);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=fighting");
-					}
-					else if (jvsmode == "drum")
-					{
-						ACJV::SetMode(JVS_MODE::DRUM);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=drum");
-					}
-					else if (jvsmode == "racing")
-					{
-						ACJV::SetMode(JVS_MODE::DRIVE);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=racing");
-					}
-					else if (jvsmode == "standard")
-					{
-						ACJV::SetMode(JVS_MODE::STANDARD);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=standard");
-					}
-					else if (jvsmode == "twinstick")
-					{
-						ACJV::SetMode(JVS_MODE::TWINSTICK);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=twinstick");
-					}
-					else
-						ACJV::SetMode(JVS_MODE::DEFAULT);
-				}
+				JVS_MODE mode;
+				if (jvsmode.empty())             mode = ACJV::ResolveModeFromGameId(s_serial);
+				else if (jvsmode == "lightgun")  mode = JVS_MODE::LIGHTGUN;
+				else if (jvsmode == "fighting")  mode = JVS_MODE::FIGHTING;
+				else if (jvsmode == "drum")      mode = JVS_MODE::DRUM;
+				else if (jvsmode == "racing")    mode = JVS_MODE::DRIVE;
+				else if (jvsmode == "standard")  mode = JVS_MODE::STANDARD;
+				else if (jvsmode == "twinstick") mode = JVS_MODE::TWINSTICK;
+				else                             mode = JVS_MODE::DEFAULT; // unknown override string
+
+				// Attach the 2nd GunCon2 only for 2-player games, so 1-player cabinets show no extra crosshair.
+				const bool lightgun = (mode == JVS_MODE::LIGHTGUN);
+				const bool two_gun = lightgun && ACJV::GetGunMapping().p2_start != 0;
+				Host::SetBaseStringSettingValue("USB1", "Type", lightgun ? "guncon2" : "None");
+				Host::SetBaseStringSettingValue("USB2", "Type", two_gun ? "guncon2" : "None");
+				ACJV::SetMode(mode);
+				Console.WriteLn(Color_Green, "ACGAME: jvsmode=%s -> JVS device mode %d%s",
+					jvsmode.empty() ? "(derived from gameid)" : jvsmode.c_str(),
+					static_cast<int>(mode), lightgun ? (two_gun ? " -> GunCon2 on USB1+USB2" : " -> GunCon2 on USB1") : "");
 
 				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
 				int R;

@@ -130,6 +130,16 @@ static bool s_scale_changed = false;
 static std::array<ImGuiManager::SoftwareCursor, InputManager::MAX_SOFTWARE_CURSORS> s_software_cursors = {};
 static ImGuiManager::BezelOverlay s_bezel_overlay = {};
 
+// Durable CPU-side record of each software cursor, so a dropped GS texture command self-heals (see DrawSoftwareCursors).
+struct DesiredSoftwareCursor
+{
+	std::string image_path;
+	float scale = 1.0f;
+	u32 color = 0xFF000000;
+};
+static std::array<DesiredSoftwareCursor, InputManager::MAX_SOFTWARE_CURSORS> s_software_cursor_desired = {};
+static std::mutex s_software_cursor_lock;
+
 void ImGuiManager::SetFonts(std::vector<FontInfo> info)
 {
 	s_font_info = std::move(info);
@@ -1233,7 +1243,8 @@ bool ImGuiManager::IsGamepadNorthWestSwapped()
 
 void ImGuiManager::CreateSoftwareCursorTextures()
 {
-	for (u32 i = 0; i < InputManager::MAX_POINTER_DEVICES; i++)
+	// All slots, not just the mouse pointer: gun crosshairs occupy slots >= MAX_POINTER_DEVICES.
+	for (u32 i = 0; i < InputManager::MAX_SOFTWARE_CURSORS; i++)
 	{
 		if (!s_software_cursors[i].image_path.empty())
 			UpdateSoftwareCursorTexture(i);
@@ -1242,7 +1253,7 @@ void ImGuiManager::CreateSoftwareCursorTextures()
 
 void ImGuiManager::DestroySoftwareCursorTextures()
 {
-	for (u32 i = 0; i < InputManager::MAX_POINTER_DEVICES; i++)
+	for (u32 i = 0; i < InputManager::MAX_SOFTWARE_CURSORS; i++)
 	{
 		s_software_cursors[i].texture.reset();
 	}
@@ -1305,6 +1316,23 @@ void ImGuiManager::DrawSoftwareCursor(const SoftwareCursor& sc, const std::pair<
 
 void ImGuiManager::DrawSoftwareCursors()
 {
+	// Rebuild each cursor from its saved record every frame, so a lost crosshair comes back on its own.
+	{
+		std::unique_lock<std::mutex> lock(s_software_cursor_lock);
+		for (u32 i = 0; i < InputManager::MAX_SOFTWARE_CURSORS; i++)
+		{
+			SoftwareCursor& sc = s_software_cursors[i];
+			const DesiredSoftwareCursor& d = s_software_cursor_desired[i];
+			sc.color = d.color;
+			const bool want_texture = !d.image_path.empty();
+			if (sc.image_path == d.image_path && sc.scale == d.scale && (!want_texture || sc.texture))
+				continue;
+			sc.image_path = d.image_path;
+			sc.scale = d.scale;
+			UpdateSoftwareCursorTexture(i);
+		}
+	}
+
 	// This one's okay to race, worst that happens is we render the wrong number of cursors for a frame.
 	const u32 pointer_count = InputManager::MAX_POINTER_DEVICES;
 
@@ -1317,6 +1345,15 @@ void ImGuiManager::DrawSoftwareCursors()
 
 void ImGuiManager::SetSoftwareCursor(u32 index, std::string image_path, float image_scale, u32 multiply_color)
 {
+	if (index >= InputManager::MAX_SOFTWARE_CURSORS)
+		return;
+
+	{
+		// Save the desired cursor (CPU-side) so it survives if the GS command below is dropped.
+		std::unique_lock<std::mutex> lock(s_software_cursor_lock);
+		s_software_cursor_desired[index] = {image_path, image_scale, multiply_color | 0xFF000000};
+	}
+
 	MTGS::RunOnGSThread([index, image_path = std::move(image_path), image_scale, multiply_color]() {
 		pxAssert(index < std::size(s_software_cursors));
 
