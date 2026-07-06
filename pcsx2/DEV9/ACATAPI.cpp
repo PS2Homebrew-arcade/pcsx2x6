@@ -171,6 +171,7 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
         break;
 
     case ATAPICMD::INQUIRY: {
+        ACATA_LOG("ATAPI INQUIRY");
         // The disc driver sends INQUIRY to check the drive is a CD/DVD-ROM before it
         // mounts "cdrom:". Answer as a DVD-ROM drive or the mount never happens.
         u8 alloc_len = P.raw8[4];
@@ -258,6 +259,7 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
             atapi_complete_nodata();
             break;
         }
+        ACATA_LOG("ATAPI READ_10 lba:%08X sectors:%02X dma:%s", transf_lba, nsec, ACATA_ISDMA);
         if (ACATA_ISDMA) {
             u32 total = nsec * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
             bool ok = false;

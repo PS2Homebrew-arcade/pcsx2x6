@@ -1360,6 +1360,12 @@ struct Pcsx2Config
 
 	BITFIELD32()
 	bool
+		ArcadeSRAMVerboseReads : 1,
+		ArcadeATAVerboseReads : 1;
+	BITFIELD_END
+
+	BITFIELD32()
+	bool
 		CdvdVerboseReads : 1, // enables cdvd read activity verbosely dumped to the console
 		CdvdDumpBlocks : 1, // enables cdvd block dumping
 		CdvdPrecache : 1, // enables cdvd precaching of compressed images

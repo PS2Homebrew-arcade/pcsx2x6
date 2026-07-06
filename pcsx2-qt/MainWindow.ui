@@ -149,6 +149,8 @@
     <addaction name="actionEnableEEConsoleLogging"/>
     <addaction name="actionEnableIOPConsoleLogging"/>
     <addaction name="actionEnableCDVDVerboseReads"/>
+    <addaction name="actionEnable_ACATA_Read_Logging"/>
+    <addaction name="actionEnable_SRAM_Access_Logging"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -1073,6 +1075,22 @@
    </property>
    <property name="text">
     <string>Edit &amp;Patches...</string>
+   </property>
+  </action>
+  <action name="actionEnable_ACATA_Read_Logging">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Enable ACATA Read Logging</string>
+   </property>
+  </action>
+  <action name="actionEnable_SRAM_Access_Logging">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Enable SRAM Access Logging</string>
    </property>
   </action>
  </widget>

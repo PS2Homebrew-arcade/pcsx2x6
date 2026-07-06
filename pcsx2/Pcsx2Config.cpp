@@ -2026,6 +2026,9 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 	SettingsWrapBitBool(ManuallySetRealTimeClock);
 	SettingsWrapBitBool(UseSystemLocaleFormat);
 
+	SettingsWrapBitBool(ArcadeATAVerboseReads);
+	SettingsWrapBitBool(ArcadeSRAMVerboseReads);
+
 	// Process various sub-components:
 
 	Speedhacks.LoadSave(wrap);
