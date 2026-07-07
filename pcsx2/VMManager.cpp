@@ -176,6 +176,7 @@ static std::deque<std::thread> s_save_state_threads;
 static std::mutex s_save_state_threads_mutex;
 
 static std::recursive_mutex s_info_mutex;
+static std::string s_arcade_gameid;
 static std::string s_disc_serial;
 static std::string s_disc_elf;
 static std::string s_disc_version;
@@ -1109,7 +1110,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 			serial_is_valid = !s_disc_serial.empty();
 		}
 		else if (!s_acgame.empty()) {
-			//s_disc_serial = Path::GetFileTitle(s_acgame);
+			s_disc_serial = s_arcade_gameid;
 			title = s_title;
 			s_disc_version = {};
 			s_disc_crc = 0;
@@ -1344,7 +1345,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc");
 				s_title = s_serial = INI.GetStringValue("game", "name");
-				s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
+				s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
 				s_acgame_serial = s_serial;
 				bool idvalid = (s_serial.length() == 7 && (s_serial[0] == 'N' && s_serial[1] == 'M'));
     			for (int i = 2; idvalid && i < 7; i++)
