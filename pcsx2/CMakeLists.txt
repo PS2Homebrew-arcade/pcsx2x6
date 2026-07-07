@@ -395,6 +395,7 @@ set(pcsx2USBSources
 	USB/usb-mic/usb-headset.cpp
 	USB/usb-mic/usb-mic.cpp
 	USB/usb-msd/usb-msd.cpp
+	USB/usb-eth/usb-uepcb.cpp
 	USB/usb-pad/lg/lg_ff.cpp
 	USB/usb-pad/usb-buzz.cpp
 	USB/usb-pad/usb-gametrak.cpp
@@ -434,6 +435,7 @@ set(pcsx2USBHeaders
 	USB/usb-mic/usb-headset.h
 	USB/usb-mic/usb-mic.h
 	USB/usb-msd/usb-msd.h
+	USB/usb-eth/usb-uepcb.h
 	USB/usb-pad/lg/lg_ff.h
 	USB/usb-pad/usb-buzz.h
 	USB/usb-pad/usb-gametrak.h
