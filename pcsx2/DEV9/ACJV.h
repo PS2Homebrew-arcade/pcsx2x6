@@ -107,6 +107,7 @@ namespace ACJV {
     };
 
     extern bool enabled;
+    extern u16 coin[2];
 
     u16 Read16(u32 addr);
     void Write16(u32 addr, u16 val);
@@ -211,10 +212,10 @@ enum JVS { //https://github.com/TheOnlyJoey/openjvs/wiki/Command-list
 };
 
 enum COINCOND { // Coin Slot condition
-			COIN_NORMAL=0,// normal
-			COIN_JAMMED,  // coin jam
-			COIN_DISCON,  // counter disconnected
-			COIN_BUSY,    // busy
+    COIN_NORMAL=0,// normal
+    COIN_JAMMED,  // coin jam
+    COIN_DISCON,  // counter disconnected
+    COIN_BUSY,    // busy
 };
 
 enum DIPS {

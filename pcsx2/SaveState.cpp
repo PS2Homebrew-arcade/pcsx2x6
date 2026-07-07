@@ -561,6 +561,18 @@ public:
 	uint GetDataSize() const override { return ACSRAM_MAX_SIZE; }
 };
 
+#include "DEV9/ACJV.h"
+// lazy hack, if we ever need something else stored beyond coins count, move to `union {struct{...}; u8[]};` style
+class SavestateEntry_JVSSTATE final : public MemorySavestateEntry
+{
+public:
+	~SavestateEntry_JVSSTATE() override = default;
+
+	const char* GetFilename() const override { return "jvs_state.bin"; }
+	u8* GetDataPtr() const override { return (u8*)ACJV::coin; }
+	uint GetDataSize() const override { return sizeof(ACJV::coin); }
+};
+
 class SavestateEntry_HwRegs final : public MemorySavestateEntry
 {
 public:
@@ -719,6 +731,7 @@ static const std::unique_ptr<BaseSavestateEntry> SavestateEntries[] = {
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_IopMemory),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_ACRAM),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_ACSRAM),
+	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_JVSSTATE),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_HwRegs),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_IopHwRegs),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_Scratchpad),

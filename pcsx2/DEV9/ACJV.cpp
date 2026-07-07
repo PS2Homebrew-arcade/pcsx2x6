@@ -352,11 +352,11 @@ void ACJV::Write16(u32 addr, u16 val) {
 #define JVS_ASSERT(x) if (!(x)) Console.WriteLn("## ASSERT ## %s:%s:%d %s", __FILE__, __FUNCTION__, __LINE__, #x);
 
 // JVS bus state — volatile runtime values, reset on game switch (see SetGameId)
+
+u16 ACJV::coin[2] = {0, 0};
 static u16 m_jvsSystemButtonState = 0;
 static u16 m_jvsButtonState[JVS_PLAYER_COUNT] = {};
 static u8 m_testButtonState = 0;
-static u16 m_coin1 = 0;
-static u16 m_coin2 = 0;
 static u16 m_jvsScreenPosX[JVS_PLAYER_COUNT] = {};
 static u16 m_jvsScreenPosY[JVS_PLAYER_COUNT] = {};
 static float m_jvsLightgunDX[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};  // per-player normalized display X (-1 = off-screen)
@@ -530,9 +530,9 @@ void ACJV::SetMacroState(u32 player, u32 index, bool active)
 void ACJV::InsertCoin(u32 slot)
 {
 	if (slot == 0)
-		m_coin1++;
+		ACJV::coin[0]++;
 	else if (slot == 1)
-		m_coin2++;
+		ACJV::coin[1]++;
 }
 
 void ACJV::SetMode(JVS_MODE mode)
@@ -601,8 +601,8 @@ void ACJV::SetGameId(const std::string& gameid)
 	s_gameid = gameid;
 	// Clean slate: zero all input state on game switch within the emulator
 	ACUART::ResetBg3State(); // re-arm the BG3 acuart HANDLE handshake so a game RESET boots cleanly (no HANDLE ERROR)
-	m_coin1 = 0;
-	m_coin2 = 0;
+	ACJV::coin[0] = 0;
+	ACJV::coin[1] = 0;
 	m_jvsButtonState[0] = 0;
 	m_jvsButtonState[1] = 0;
 	m_jvsSystemButtonState = 0;
@@ -887,7 +887,7 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*dstSize) += 4;
 
 			//if (m_jvsButtonState[0])
-			//	Console.WriteLn("JVS P1 buttons: %04X coin:%d", m_jvsButtonState[0], m_coin1);
+			//	Console.WriteLn("JVS P1 buttons: %04X coin:%d", m_jvsButtonState[0], ACJV::coin[0]);
 
 			if(playerCount == 2)
 			{
@@ -911,15 +911,15 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 			(*output++) = JVS_CMD_SUCCESS;
 
-			(*output++) = static_cast<u8>(((m_coin1 >> 8) & 0x3f) | (slot1Condition << 6)); //Coin 1 MSB + slot1condition
-			(*output++) = static_cast<u8>(m_coin1 & 0x00ff);                                //Coin 1 LSB
+			(*output++) = static_cast<u8>(((ACJV::coin[0] >> 8) & 0x3f) | (slot1Condition << 6)); //Coin 1 MSB + slot1condition
+			(*output++) = static_cast<u8>(ACJV::coin[0] & 0x00ff);                                //Coin 1 LSB
 
 			(*dstSize) += 3;
 
 			if(slotCount == 2)
 			{
-				(*output++) = static_cast<u8>(((m_coin2 >> 8) & 0x3f) | (slot2Condition << 6)); //Coin 2 MSB + slot2condition
-				(*output++) = static_cast<u8>(m_coin2 & 0x00ff);                                //Coin 2 LSB
+				(*output++) = static_cast<u8>(((ACJV::coin[1] >> 8) & 0x3f) | (slot2Condition << 6)); //Coin 2 MSB + slot2condition
+				(*output++) = static_cast<u8>(ACJV::coin[1] & 0x00ff);                                //Coin 2 LSB
 
 				(*dstSize) += 2;
 			}
@@ -937,8 +937,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 			//inWorkChecksum += slotCount;
 			inSize -= 3;
 
-			if(slotCount == 1) m_coin1 += (amountMSB << 8) + amountLSB;
-			if(slotCount == 2) m_coin2 += (amountMSB << 8) + amountLSB;
+			if(slotCount == 1) ACJV::coin[0] += (amountMSB << 8) + amountLSB;
+			if(slotCount == 2) ACJV::coin[1] += (amountMSB << 8) + amountLSB;
 
 			(*output++) = JVS_CMD_SUCCESS;
 
@@ -957,8 +957,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 			//inWorkChecksum += slotCount;
 			inSize -= 3;
 
-			if(slotCount == 1) m_coin1 -= (amountMSB << 8) + amountLSB;
-			if(slotCount == 2) m_coin2 -= (amountMSB << 8) + amountLSB;
+			if(slotCount == 1) ACJV::coin[0] -= (amountMSB << 8) + amountLSB;
+			if(slotCount == 2) ACJV::coin[1] -= (amountMSB << 8) + amountLSB;
 
 			(*output++) = JVS_CMD_SUCCESS;
 
@@ -1181,5 +1181,5 @@ void ACJV::UpdateFcaFrame()
 	rdbuf[0xe2] = (s_dip_switch_state & TESTMODE) ? 0x80 : 0;
 
 	// COIN: FCA-1 coin counter @rdbuf[0xc0]; RRV credits on increase (FUN_0022aa88). Mirror our coin count.
-	rdbuf[0xc0] = (u8)m_coin1;
+	rdbuf[0xc0] = (u8)ACJV::coin[0];
 }
