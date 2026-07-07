@@ -53,22 +53,14 @@ the [latest release of proverb](https://github.com/PS2Homebrew-arcade/proverb/re
 NOT IMPLEMENTED YET
 
 ### `jvsmode`
-JVS input parameters.
+manual JVS input parameters.
+This is mostly for messing around
 
-Possible values:
-- `lightgun`
-- `fighting`
-
-!!! note "Temporary solution"
-
-	As this project evolves, this setting value might be deprecated in favor of a gameID detection system
+starting with **v0.0.33** the appropiate input system is automatically detected from the gameID
 
 ### `media`
 tells the emulator the correct sector size for data transfers (VERY IMPORTANT)
 
-> when game's put requests to read data from their storage device, they don't ask for bytes, they ask for an ammount of LBA's
-> LBA's size (in bytes) depends on the device. it is 512 for HDD, 2048 for DVDs, etc..
-> just make sure to have the proper value here
 
 ## game library template
 
