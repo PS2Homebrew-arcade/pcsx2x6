@@ -13,6 +13,8 @@
 static u8 atapi_pio_buf[65536];
 static u32 atapi_pio_len = 0;
 static u32 atapi_pio_pos = 0;
+static u32 atapi_pio_chunk = 0;      // max bytes sent per chunk (the byte-count register is only 16-bit)
+static int atapi_pio_chunk_busy = 0; // >0 while we set up the next chunk
 
 static u8 atapi_pio_write_buf[65536];
 static u32 atapi_pio_write_len = 0;
@@ -44,8 +46,13 @@ static void atapi_pio_write_setup(u32 len) {
 static void atapi_pio_setup(u32 len) {
     atapi_pio_len = len;
     atapi_pio_pos = 0;
-    ACATA::R_LCYL = len & 0xFF;
-    ACATA::R_HCYL = (len >> 8) & 0xFF;
+    u32 limit = (ACATA::R_LCYL | (ACATA::R_HCYL << 8)) & 0xFFFE; // chunk size the driver asked for
+    if (limit == 0)
+        limit = 0xFFFE;
+    atapi_pio_chunk = limit;
+    u32 chunk = std::min(len, atapi_pio_chunk);
+    ACATA::R_LCYL = chunk & 0xFF;
+    ACATA::R_HCYL = (chunk >> 8) & 0xFF;
     ACATA::R_NSECTOR = 0x02;
     ACATA::R_STATUS |= ATA_STAT_DRQ;
     CLRB(ACATA::R_STATUS, ATA_STAT_BUSY);
@@ -87,10 +94,16 @@ u16 ACATAPI::pio_read_word() {
         if (offset + 1 < atapi_pio_len)
             val |= (u16)atapi_pio_buf[offset + 1] << 8;
         atapi_pio_pos++;
-        if (atapi_pio_pos * 2 >= atapi_pio_len) {
+        u32 bytepos = atapi_pio_pos * 2;
+        if (bytepos >= atapi_pio_len) {
             ACATA::R_NSECTOR = 0x03;
             CLRB(ACATA::R_STATUS, ATA_STAT_DRQ);
             ACATA::R_STATUS |= ATA_STAT_READY;
+            ACCORE::intr(ACCORE::INTRN_ATA);
+        } else if (atapi_pio_chunk && (bytepos % atapi_pio_chunk) == 0) { // end of a chunk: set up the next one
+            CLRB(ACATA::R_STATUS, ATA_STAT_DRQ);
+            ACATA::R_STATUS |= ATA_STAT_BUSY;
+            atapi_pio_chunk_busy = 1;
             ACCORE::intr(ACCORE::INTRN_ATA);
         }
         return val;
@@ -99,7 +112,23 @@ u16 ACATAPI::pio_read_word() {
 }
 
 bool ACATAPI::has_pio_data() {
-    return atapi_pio_len > 0 && atapi_pio_pos * 2 < atapi_pio_len;
+    return atapi_pio_chunk_busy == 0 && atapi_pio_len > 0 && atapi_pio_pos * 2 < atapi_pio_len;
+}
+
+// Between chunks: stay busy for a few status polls, then offer the next chunk.
+void ACATAPI::chunk_poll() {
+    if (atapi_pio_chunk_busy == 0)
+        return;
+    if (atapi_pio_chunk_busy++ < 3) // wait a few polls before offering the next chunk
+        return;
+    atapi_pio_chunk_busy = 0;
+    u32 next = std::min(atapi_pio_len - atapi_pio_pos * 2, atapi_pio_chunk);
+    ACATA::R_LCYL = next & 0xFF;
+    ACATA::R_HCYL = (next >> 8) & 0xFF;
+    ACATA::R_NSECTOR = 0x02;
+    CLRB(ACATA::R_STATUS, ATA_STAT_BUSY);
+    ACATA::R_STATUS |= ATA_STAT_DRQ;
+    ACCORE::intr(ACCORE::INTRN_ATA);
 }
 
 void ACATAPI::pio_write_word(u16 val) {
@@ -140,6 +169,25 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
     case ATAPICMD::TEST_UNIT_READY:
         atapi_complete_nodata();
         break;
+
+    case ATAPICMD::INQUIRY: {
+        // The disc driver sends INQUIRY to check the drive is a CD/DVD-ROM before it
+        // mounts "cdrom:". Answer as a DVD-ROM drive or the mount never happens.
+        u8 alloc_len = P.raw8[4];
+        memset(atapi_pio_buf, 0, 36);
+        atapi_pio_buf[0] = 0x05; // peripheral device type: CD/DVD-ROM
+        atapi_pio_buf[1] = 0x80; // removable medium
+        atapi_pio_buf[3] = 0x21; // response data format
+        atapi_pio_buf[4] = 0x1F; // additional length: 31 more bytes -> 36 total
+        memcpy(&atapi_pio_buf[8],  "LECTORA ", 8);
+        memcpy(&atapi_pio_buf[16], "DE MIERDA       ", 16);
+        memcpy(&atapi_pio_buf[32], "1.00", 4);
+        u32 resp_len = 36;
+        if (alloc_len > 0 && alloc_len < resp_len)
+            resp_len = alloc_len;
+        atapi_pio_setup(resp_len);
+        break;
+    }
 
     case ATAPICMD::READ_CAPACITY: {
         if ((ACATA::TH::IMAGE || ACATA::TH::isCHD) && ACATA::TH::IMAGESIZE > 0) {

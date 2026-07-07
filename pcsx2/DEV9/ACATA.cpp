@@ -68,6 +68,7 @@ u16 ACATA::read16(u32 addr) {
     case ACATA_R_DATA:
         return ACATA::handle_dataR(addr);
     case ACATA_R_STATUS_ALT:
+        ACATAPI::chunk_poll();
         return R_STATUS;
     case ACATA_R_NSECTOR:
         return R_NSECTOR;
@@ -82,6 +83,7 @@ u16 ACATA::read16(u32 addr) {
     case ACATA_R_HCYL:
         return R_HCYL;
     case ACATA_R_STATUS:
+        ACATAPI::chunk_poll();
         // reading R_STATUS after writing zero to it? this is the ACATA probe. we have to respond BUSY at least once for the driver to keep going
         // FIXME
         if (ACATA::last_write == ACATA_R_STATUS && ACATA::cmd_handled == 0 && ((R_SELECT & ACATA_UNIT1) == 0)) {
@@ -156,6 +158,9 @@ u16 ACATA::handle_dataR(u32 addr) { // PIO read at R_DATA
                 ACATA::cmd_handled = -1;
                 CLRB(R_STATUS, ATA_STAT_DRQ);
                 R_STATUS |= ATA_STAT_READY;
+                // Tell the guest the read finished, or it waits here forever and never
+                // sends its first ATAPI command.
+                ACCORE::intr(ACCORE::INTRN_ATA);
             }
             return word;
         }

@@ -113,6 +113,25 @@ namespace ImGuiManager
 	/// Checks if the North/West gamepad buttons are swapped within ImGui
 	bool IsGamepadNorthWestSwapped();
 
+	enum class BezelFitMode : u8
+	{
+		Stretch,
+		Contain,
+		Cover,
+	};
+
+	/// Sets a global 2D bezel image overlay.
+	void SetBezelOverlay(bool enabled, std::string image_path, float opacity, float scale, BezelFitMode fit_mode);
+
+	/// Clears the active bezel overlay.
+	void ClearBezelOverlay();
+
+	/// Reloads the active bezel image from disk.
+	void ReloadBezelOverlay();
+
+	/// Draws the active bezel overlay.
+	void DrawBezelOverlay();
+
 	/// Sets an image and scale for a software cursor. Software cursors can be used for things like crosshairs.
 	void SetSoftwareCursor(u32 index, std::string image_path, float image_scale, u32 multiply_color = 0xFFFFFF);
 	bool HasSoftwareCursor(u32 index);

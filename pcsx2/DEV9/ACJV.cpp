@@ -31,14 +31,7 @@ enum ACJVCMD {
 };
 
 bool ACJV::enabled = false;
-#define JVS_PKTINDX_TO_ADDR(index) ((2 * (index & 0x3FFF)) + 0x12400000)
-
-#define ANS(addr, what) case addr: return what
-#define JVS_CHECK_ADDR_JVSPACKET(addr) ((addr & 0x00000F00) == 0x00000600) // when ACJV writes to 0x12406???.
 void do_acjv_packet();
-
-u16 RootAddr = 0x3E6F;
-u16 Sent0D = 0, Sent0C = 0;
 
 // R/W arrays are u8 because ACJV is processing (u8) arrays, but the MMIO is performed over (volatile u16*). leaving the higher byte empty
 std::array<u8, ACJV_PACKETSIZE> rdbuf; // NAMCO_PCB ---> IOP
@@ -79,189 +72,7 @@ static constexpr const std::array<u16, ACJV::NUM_DIP_SWITCHES> s_dip_switch_mask
 	DIPS::VIDEO_SYNC_SPLIT,
 }};
 
-static constexpr const std::array<ACJV::DIPSwitchInfo, ACJV::NUM_DIP_SWITCHES> s_dip_switch_info = {{
-	{"TestMode", TRANSLATE_NOOP("JVS", "Test Mode"), "ToggleTestMode", false},
-	{"VideoVoltage", TRANSLATE_NOOP("JVS", "Video Voltage"), "ToggleVideoVoltage", true},
-	{"MonitorSyncFrequency", TRANSLATE_NOOP("JVS", "Monitor Sync Frequency"), "ToggleMonitorSyncFrequency", true},
-	{"VideoSyncSplit", TRANSLATE_NOOP("JVS", "Video Sync Split"), "ToggleVideoSyncSplit", true},
-}};
-
-static constexpr const std::array<InputBindingInfo, ACJV::NUM_DIP_SWITCHES> s_dip_switch_bindings = {{
-	{s_dip_switch_info[0].toggle_bind_name, TRANSLATE_NOOP("JVS", "Toggle Test Mode"), nullptr, InputBindingInfo::Type::Button, 0, GenericInputBinding::Unknown},
-	{s_dip_switch_info[1].toggle_bind_name, TRANSLATE_NOOP("JVS", "Toggle Video Voltage"), nullptr, InputBindingInfo::Type::Button, 1, GenericInputBinding::Unknown},
-	{s_dip_switch_info[2].toggle_bind_name, TRANSLATE_NOOP("JVS", "Toggle Monitor Sync Frequency"), nullptr, InputBindingInfo::Type::Button, 2, GenericInputBinding::Unknown},
-	{s_dip_switch_info[3].toggle_bind_name, TRANSLATE_NOOP("JVS", "Toggle Video Sync Split"), nullptr, InputBindingInfo::Type::Button, 3, GenericInputBinding::Unknown},
-}};
-
-static constexpr const std::array<InputBindingInfo, 12> s_jvs_p1_button_bindings = {{
-	{"P1_Up",      TRANSLATE_NOOP("JVS", "P1 Up"),       nullptr, InputBindingInfo::Type::Button, JVS_BTN_UP,      GenericInputBinding::DPadUp},
-	{"P1_Down",    TRANSLATE_NOOP("JVS", "P1 Down"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_DOWN,    GenericInputBinding::DPadDown},
-	{"P1_Left",    TRANSLATE_NOOP("JVS", "P1 Left"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_LEFT,    GenericInputBinding::DPadLeft},
-	{"P1_Right",   TRANSLATE_NOOP("JVS", "P1 Right"),    nullptr, InputBindingInfo::Type::Button, JVS_BTN_RIGHT,   GenericInputBinding::DPadRight},
-	{"P1_Button1", TRANSLATE_NOOP("JVS", "P1 Button 1"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_1,       GenericInputBinding::Square},
-	{"P1_Button2", TRANSLATE_NOOP("JVS", "P1 Button 2"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_2,       GenericInputBinding::Triangle},
-	{"P1_Button3", TRANSLATE_NOOP("JVS", "P1 Button 3"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_3,       GenericInputBinding::Unknown},
-	{"P1_Button4", TRANSLATE_NOOP("JVS", "P1 Button 4"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_4,       GenericInputBinding::Cross},
-	{"P1_Button5", TRANSLATE_NOOP("JVS", "P1 Button 5"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_5,       GenericInputBinding::Circle},
-	{"P1_Button6", TRANSLATE_NOOP("JVS", "P1 Button 6"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_6,       GenericInputBinding::Unknown},
-	{"P1_Start",   TRANSLATE_NOOP("JVS", "P1 Start"),    nullptr, InputBindingInfo::Type::Button, JVS_BTN_START,   GenericInputBinding::Start},
-	{"P1_Service", TRANSLATE_NOOP("JVS", "P1 Service"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE, GenericInputBinding::Select},
-}};
-
-static constexpr const std::array<InputBindingInfo, 12> s_jvs_p2_button_bindings = {{
-	{"P2_Up",      TRANSLATE_NOOP("JVS", "P2 Up"),       nullptr, InputBindingInfo::Type::Button, JVS_BTN_UP,      GenericInputBinding::DPadUp},
-	{"P2_Down",    TRANSLATE_NOOP("JVS", "P2 Down"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_DOWN,    GenericInputBinding::DPadDown},
-	{"P2_Left",    TRANSLATE_NOOP("JVS", "P2 Left"),     nullptr, InputBindingInfo::Type::Button, JVS_BTN_LEFT,    GenericInputBinding::DPadLeft},
-	{"P2_Right",   TRANSLATE_NOOP("JVS", "P2 Right"),    nullptr, InputBindingInfo::Type::Button, JVS_BTN_RIGHT,   GenericInputBinding::DPadRight},
-	{"P2_Button1", TRANSLATE_NOOP("JVS", "P2 Button 1"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_1,       GenericInputBinding::Square},
-	{"P2_Button2", TRANSLATE_NOOP("JVS", "P2 Button 2"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_2,       GenericInputBinding::Triangle},
-	{"P2_Button3", TRANSLATE_NOOP("JVS", "P2 Button 3"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_3,       GenericInputBinding::Unknown},
-	{"P2_Button4", TRANSLATE_NOOP("JVS", "P2 Button 4"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_4,       GenericInputBinding::Cross},
-	{"P2_Button5", TRANSLATE_NOOP("JVS", "P2 Button 5"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_5,       GenericInputBinding::Circle},
-	{"P2_Button6", TRANSLATE_NOOP("JVS", "P2 Button 6"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_6,       GenericInputBinding::Unknown},
-	{"P2_Start",   TRANSLATE_NOOP("JVS", "P2 Start"),    nullptr, InputBindingInfo::Type::Button, JVS_BTN_START,   GenericInputBinding::Start},
-	{"P2_Service", TRANSLATE_NOOP("JVS", "P2 Service"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_SERVICE, GenericInputBinding::Select},
-}};
-
-static constexpr const std::array<InputBindingInfo, 4> s_jvs_wheel_bindings = {{ // driving analog bindings, auto-mirrored from Pad0
-	{"SteerRight", TRANSLATE_NOOP("JVS", "Steering Right"), nullptr, InputBindingInfo::Type::HalfAxis, 0, GenericInputBinding::LeftStickRight},
-	{"SteerLeft",  TRANSLATE_NOOP("JVS", "Steering Left"),  nullptr, InputBindingInfo::Type::HalfAxis, 1, GenericInputBinding::LeftStickLeft},
-	{"Gas",        TRANSLATE_NOOP("JVS", "Accelerator"),    nullptr, InputBindingInfo::Type::HalfAxis, 2, GenericInputBinding::R2},
-	{"Brake",      TRANSLATE_NOOP("JVS", "Brake"),          nullptr, InputBindingInfo::Type::HalfAxis, 3, GenericInputBinding::L2},
-}};
-
-// Per-layout face button default inputs (BTN1-6), mirroring each game's
-// official PS2 port pad. Some games share the same layout. Rows follow FightingLayout order.
-static constexpr GenericInputBinding s_fighting_face_buttons[][6] = {
-	// BTN1,                       BTN2,                          BTN3,                         BTN4,                          BTN5,                         BTN6
-	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Unknown}, // TEKKEN
-	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Cross,   GenericInputBinding::Circle,   GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // GUNDAM (YuYu + Gundam VS)
-	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::L1,      GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::R1},      // SIX_BUTTON
-	{GenericInputBinding::Square, GenericInputBinding::Triangle, GenericInputBinding::Circle,  GenericInputBinding::Cross,    GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // SOULCAL
-	{GenericInputBinding::Square, GenericInputBinding::Cross,    GenericInputBinding::Circle,  GenericInputBinding::Triangle, GenericInputBinding::Unknown, GenericInputBinding::Unknown}, // BLOODYROAR
-};
-
-static std::array<InputBindingInfo, 12> s_active_p1_bindings;
-static std::array<InputBindingInfo, 12> s_active_p2_bindings;
-
-// Copy the base P1/P2 tables, then set the default pad button of BTN1-6 from
-// the game's layout row. Binding table indices:
-//   [0]=Up    [1]=Down  [2]=Left   [3]=Right
-//   [4]=BTN1  [5]=BTN2  [6]=BTN3   [7]=BTN4
-//   [8]=BTN5  [9]=BTN6  [10]=Start [11]=Service
-static void UpdateFightingBindings(FightingLayout layout)
-{
-	s_active_p1_bindings = s_jvs_p1_button_bindings;
-	s_active_p2_bindings = s_jvs_p2_button_bindings;
-	const auto& face = s_fighting_face_buttons[static_cast<int>(layout)];
-	constexpr int BTN1_INDEX = 4;
-	for (int i = 0; i < 6; i++)
-	{
-		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = face[i];
-		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = face[i];
-	}
-}
-
-// Generic racing layout (BTN1-6): each entry sets its own JVS bit, so a game can wire switches beyond Sw1-6 (e.g. AD3's Push9).
-struct RacingButton { u16 bind_index; GenericInputBinding host; };
-static constexpr RacingButton s_racing_buttons[][6] = {
-	{ // ACEDRIVER3 (BTN1-6)
-		{JVS_BTN_1, GenericInputBinding::Square},   // ENTER
-		{JVS_BTN_2, GenericInputBinding::Unknown},  // unused
-		{JVS_BTN_3, GenericInputBinding::R1},       // GEAR UP
-		{JVS_BTN_4, GenericInputBinding::L1},       // GEAR DOWN (next to L2 = brake)
-		{JVS_BTN_5, GenericInputBinding::Unknown},  // unused
-		{JVS_BTN_9, GenericInputBinding::Triangle}, // VIEW CHANGE (Push9)
-	},
-};
-
-// Apply a racing layout: copy the base tables, then remap the buttons (JVS bit + pad button) per game.
-static void UpdateRacingBindings(RacingLayout layout)
-{
-	s_active_p1_bindings = s_jvs_p1_button_bindings;
-	s_active_p2_bindings = s_jvs_p2_button_bindings;
-	if (layout == RacingLayout::BG3)
-	{
-		// BG3/Tuned: JVS switch -> function map, RE'd from the game's switch chain @0x1e3f90.
-		const auto remap = [](std::array<InputBindingInfo, 12>& b) {
-			for (InputBindingInfo& e : b)
-			{
-				switch (e.bind_index)
-				{
-					case JVS_BTN_RIGHT: e.generic_mapping = GenericInputBinding::R1; break;       // SHIFT UP
-					case JVS_BTN_1:     e.generic_mapping = GenericInputBinding::L1; break;        // SHIFT DOWN
-					case JVS_BTN_DOWN:  e.generic_mapping = GenericInputBinding::Triangle; break;  // VIEW
-					case JVS_BTN_LEFT:  e.generic_mapping = GenericInputBinding::Square; break;    // SIDEBRAKE
-					case JVS_BTN_UP:    e.generic_mapping = GenericInputBinding::Circle; break;    // HAZARD
-					case JVS_BTN_START:
-					case JVS_BTN_SERVICE: break;
-					default:            e.generic_mapping = GenericInputBinding::Unknown; break;   // unused -> no double-trigger
-				}
-			}
-		};
-		remap(s_active_p1_bindings);
-		remap(s_active_p2_bindings);
-		return;
-	}
-	if (layout == RacingLayout::WANGAN)
-	{
-		// Wangan Midnight / R (NM00008/05): map confirmed live via I/O-TEST SWITCH-TEST.
-		const auto remap = [](std::array<InputBindingInfo, 12>& b) {
-			for (InputBindingInfo& e : b)
-			{
-				switch (e.bind_index)
-				{
-					case JVS_BTN_3: e.generic_mapping = GenericInputBinding::R1;       break; // Sw3 = SHIFT UP
-					case JVS_BTN_4: e.generic_mapping = GenericInputBinding::L1;       break; // Sw4 = SHIFT DOWN
-					case JVS_BTN_1: e.generic_mapping = GenericInputBinding::Square;   break; // Sw1
-					case JVS_BTN_2: e.generic_mapping = GenericInputBinding::Triangle; break; // Sw2
-					case JVS_BTN_5: e.generic_mapping = GenericInputBinding::Circle;   break; // Sw5
-					case JVS_BTN_6: e.generic_mapping = GenericInputBinding::Cross;    break; // Sw6
-					default: break;
-				}
-			}
-		};
-		remap(s_active_p1_bindings);
-		remap(s_active_p2_bindings);
-		return;
-	}
-	if (layout == RacingLayout::RRV)
-	{
-		// Ridge Racer V (NM00001): map from the switch builder FUN_0022ab70 (Ghidra).
-		const auto remap = [](std::array<InputBindingInfo, 12>& b) {
-			for (InputBindingInfo& e : b)
-			{
-				switch (e.bind_index)
-				{
-					case JVS_BTN_3: e.generic_mapping = GenericInputBinding::R1;       break; // Sw3 = SHIFT UP
-					case JVS_BTN_4: e.generic_mapping = GenericInputBinding::L1;       break; // Sw4 = SHIFT DOWN
-					case JVS_BTN_2: e.generic_mapping = GenericInputBinding::Triangle; break; // Sw2 = VIEW CHANGE
-					case JVS_BTN_1: e.generic_mapping = GenericInputBinding::Square;   break; // Sw1 = ENTER
-					case JVS_BTN_5: e.generic_mapping = GenericInputBinding::Unknown;  break; // unused -> no double-trigger
-					case JVS_BTN_6: e.generic_mapping = GenericInputBinding::Unknown;  break; // unused
-					default: break;
-				}
-			}
-		};
-		remap(s_active_p1_bindings);
-		remap(s_active_p2_bindings);
-		return;
-	}
-	const auto& btns = s_racing_buttons[static_cast<int>(layout)];
-	constexpr int BTN1_INDEX = 4;
-	for (int i = 0; i < 6; i++)
-	{
-		s_active_p1_bindings[BTN1_INDEX + i].bind_index = btns[i].bind_index;
-		s_active_p1_bindings[BTN1_INDEX + i].generic_mapping = btns[i].host;
-		s_active_p2_bindings[BTN1_INDEX + i].bind_index = btns[i].bind_index;
-		s_active_p2_bindings[BTN1_INDEX + i].generic_mapping = btns[i].host;
-	}
-}
-
-static constexpr const std::array<InputBindingInfo, 2> s_jvs_coin_bindings = {{
-	{"Coin1", TRANSLATE_NOOP("JVS", "Insert Coin P1"), nullptr, InputBindingInfo::Type::Button, 0, GenericInputBinding::Unknown},
-	{"Coin2", TRANSLATE_NOOP("JVS", "Insert Coin P2"), nullptr, InputBindingInfo::Type::Button, 1, GenericInputBinding::Unknown},
-}};
+#include "ACJV_Inputs.h"
 
 static u16 s_dip_switch_state = DEFAULT_DIP_SWITCH_STATE;
 static bool s_suppress_daemon = true;
@@ -329,15 +140,16 @@ static JVS_MODE m_jvsMode = JVS_MODE::DEFAULT;
 
 std::span<const InputBindingInfo> ACJV::GetButtonBindings()
 {
-	if (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE)
-		return s_active_p1_bindings;
+	if (m_jvsMode == JVS_MODE::TWINSTICK)
+		return s_twinstick_p1_button_bindings;
 	return s_jvs_p1_button_bindings;
 }
 
 std::span<const InputBindingInfo> ACJV::GetP2ButtonBindings()
 {
-	if (m_jvsMode == JVS_MODE::FIGHTING || m_jvsMode == JVS_MODE::DRIVE)
-		return s_active_p2_bindings;
+	// Twin-stick (Zoids) is 1 player per cabinet (versus is networked), so no P2 layout.
+	if (m_jvsMode == JVS_MODE::TWINSTICK)
+		return {};
 	return s_jvs_p2_button_bindings;
 }
 
@@ -349,6 +161,16 @@ std::span<const InputBindingInfo> ACJV::GetCoinBindings()
 std::span<const InputBindingInfo> ACJV::GetWheelBindings()
 {
 	return s_jvs_wheel_bindings;
+}
+
+std::span<const InputBindingInfo> ACJV::GetDrumBindings()
+{
+	return s_jvs_drum_bindings;
+}
+
+std::span<const InputBindingInfo> ACJV::GetTwinstickBindings()
+{
+	return s_twinstick_p1_button_bindings;
 }
 
 bool ACJV::GetDIPSwitchState(u32 index)
@@ -377,6 +199,58 @@ void ACJV::ToggleDIPSwitchState(u32 index)
 	s_dip_switch_state ^= mask;
 }
 
+// Fixed JVS switches a macro can fire (configurable without a running game).
+static constexpr ACJV::JvsMacroSwitch s_jvs_macro_switches[] = {
+	{"Button1", "Button 1", JVS_BTN_1},
+	{"Button2", "Button 2", JVS_BTN_2},
+	{"Button3", "Button 3", JVS_BTN_3},
+	{"Button4", "Button 4", JVS_BTN_4},
+	{"Button5", "Button 5", JVS_BTN_5},
+	{"Button6", "Button 6", JVS_BTN_6},
+};
+std::span<const ACJV::JvsMacroSwitch> ACJV::GetMacroSwitches() { return s_jvs_macro_switches; }
+
+// Per-layout macros: config keys carry the layout key (button-name prefix).
+std::string ACJV::LayoutKey(std::span<const InputBindingInfo> buttons)
+{
+	if (buttons.empty())
+		return {};
+	std::string n(buttons[0].name);
+	const size_t pos = n.find('_');
+	return (pos == std::string::npos) ? n : n.substr(0, pos);
+}
+std::string ACJV::GetCurrentLayoutKey()
+{
+	std::string k = LayoutKey(GetFightingButtons());
+	if (k.empty()) k = LayoutKey(GetRacingButtons());
+	if (k.empty()) k = LayoutKey(GetStandardButtons());
+	return k;
+}
+std::string ACJV::MacroConfigKey(const std::string& layoutKey, u32 player, u32 index, const char* suffix)
+{
+	return "Macro_" + layoutKey + "_P" + std::to_string(player + 1) + "_" + std::to_string(index + 1) + suffix;
+}
+
+// JVS macros (combo): fire switch bits for one player; masks pushed via SetMacroMask.
+struct JvsMacro { u16 mask = 0; bool active = false; };
+static JvsMacro s_jvs_macros[JVS_PLAYER_COUNT][ACJV::NUM_JVS_MACROS];
+static u16 m_jvsMacroButtonState[JVS_PLAYER_COUNT] = {};
+static void RecomputeMacroState(u32 player)
+{
+	u16 state = 0;
+	for (u32 i = 0; i < ACJV::NUM_JVS_MACROS; i++)
+		if (s_jvs_macros[player][i].active)
+			state |= s_jvs_macros[player][i].mask;
+	m_jvsMacroButtonState[player] = state;
+}
+void ACJV::SetMacroMask(u32 player, u32 index, u16 mask)
+{
+	if (player >= JVS_PLAYER_COUNT || index >= NUM_JVS_MACROS)
+		return;
+	s_jvs_macros[player][index] = {mask, false};
+	RecomputeMacroState(player);
+}
+
 void ACJV::LoadConfig(const SettingsInterface& si)
 {
 	u16 state = 0;
@@ -403,6 +277,10 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "SindenBorderEnabled");
 		dest_si->CopyIntValue(src_si, CONFIG_SECTION, "SindenBorderMode");
 		dest_si->CopyIntValue(src_si, CONFIG_SECTION, "SindenBorderThickness");
+		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "AnalogDeadzone");
+		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "AnalogSensitivity");
+		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "TriggerDeadzone");
+		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "InvertSteering");
 	}
 
 	if (copy_bindings)
@@ -415,6 +293,43 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 		for (const InputBindingInfo& bi : s_jvs_coin_bindings)
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		// Peripheral binds (drum/wheel/twinstick) have no pad-mirror fallback, so they must travel with a profile too.
+		for (const InputBindingInfo& bi : s_jvs_drum_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		for (const InputBindingInfo& bi : s_jvs_wheel_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		for (const InputBindingInfo& bi : s_twinstick_p1_button_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		// Per-layout hub binds use {base}_P1/_P2 keys (racing: _P1 only, 1 player).
+		for (const LayoutInfo& fl : s_fighting_layout_ui)
+			for (const InputBindingInfo& bi : fl.buttons)
+			{
+				dest_si->CopyStringListValue(src_si, CONFIG_SECTION, (std::string(bi.name) + "_P1").c_str());
+				dest_si->CopyStringListValue(src_si, CONFIG_SECTION, (std::string(bi.name) + "_P2").c_str());
+			}
+		for (const LayoutInfo& sl : s_standard_layout_ui)
+			for (const InputBindingInfo& bi : sl.buttons)
+			{
+				dest_si->CopyStringListValue(src_si, CONFIG_SECTION, (std::string(bi.name) + "_P1").c_str());
+				dest_si->CopyStringListValue(src_si, CONFIG_SECTION, (std::string(bi.name) + "_P2").c_str());
+			}
+		for (const RacingLayoutInfo& rl : s_racing_layout_ui)
+			for (const InputBindingInfo& bi : rl.buttons)
+				dest_si->CopyStringListValue(src_si, CONFIG_SECTION, (std::string(bi.name) + "_P1").c_str());
+		const auto copy_macros = [&](std::span<const InputBindingInfo> buttons) {
+			const std::string lk = LayoutKey(buttons);
+			if (lk.empty())
+				return;
+			for (u32 p = 0; p < JVS_PLAYER_COUNT; p++)
+				for (u32 i = 0; i < NUM_JVS_MACROS; i++)
+				{
+					dest_si->CopyStringListValue(src_si, CONFIG_SECTION, MacroConfigKey(lk, p, i, "").c_str());
+					dest_si->CopyStringListValue(src_si, CONFIG_SECTION, MacroConfigKey(lk, p, i, "Binds").c_str());
+				}
+		};
+		for (const LayoutInfo& fl : s_fighting_layout_ui) copy_macros(fl.buttons);
+		for (const RacingLayoutInfo& rl : s_racing_layout_ui)     copy_macros(rl.buttons);
+		for (const LayoutInfo& sl : s_standard_layout_ui) copy_macros(sl.buttons);
 	}
 }
 
@@ -455,15 +370,15 @@ void ACJV::Write16(u32 addr, u16 val) {
 #define JVS_ASSERT(x) if (!(x)) Console.WriteLn("## ASSERT ## %s:%s:%d %s", __FILE__, __FUNCTION__, __LINE__, #x);
 
 // JVS bus state — volatile runtime values, reset on game switch (see SetGameId)
+
+u16 ACJV::coin[2] = {0, 0};
 static u16 m_jvsSystemButtonState = 0;
 static u16 m_jvsButtonState[JVS_PLAYER_COUNT] = {};
 static u8 m_testButtonState = 0;
-static u16 m_coin1 = 0;
-static u16 m_coin2 = 0;
-static u16 m_jvsScreenPosX = 0;
-static u16 m_jvsScreenPosY = 0;
-static float m_jvsLightgunDX = -1.0f;  // normalized display X (-1 = off-screen)
-static float m_jvsLightgunDY = -1.0f;  // normalized display Y (-1 = off-screen)
+static u16 m_jvsScreenPosX[JVS_PLAYER_COUNT] = {};
+static u16 m_jvsScreenPosY[JVS_PLAYER_COUNT] = {};
+static float m_jvsLightgunDX[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};  // per-player normalized display X (-1 = off-screen)
+static float m_jvsLightgunDY[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};  // per-player normalized display Y (-1 = off-screen)
 static u16 m_jvsWheelChannels[JVS_WHEEL_CHANNEL_MAX] = {};
 static u16 m_jvsDrumChannels[JVS_DRUM_CHANNEL_MAX] = {};
 
@@ -475,7 +390,6 @@ static float m_wheelBrake  = 0.0f; // left trigger  (L2)
 // Per-game JVS button mapping for lightgun games, keyed by NM game ID (see issue #9).
 // Field order: pedal, sensor, sensor_active_high, p1_start, p2_start, p1_trigger, p2_trigger
 // Each value is a JVS bit from JVSButton enum. 0 = not used for this game.
-// This table serves as template for future per-game configs (fighting, driving, drum, etc).
 static const GunMapping s_default_gun_mapping = {JVS_BTN_3, JVS_BTN_RIGHT, false, 0, 0, JVS_BTN_2, 0};
 static const std::map<std::string, GunMapping> s_gun_mappings = {
 	{"NM00003", {0,            0x200,         true,  JVS_BTN_3,  JVS_BTN_6, JVS_BTN_2,    JVS_BTN_5}}, // Vampire Night
@@ -492,14 +406,14 @@ static const std::map<std::string, FightingLayout> s_fighting_layouts = {
 	{"NM00007", FightingLayout::SOULCAL},    // Soul Calibur II
 	{"NM00031", FightingLayout::SOULCAL},    // Soul Calibur III
 	{"NM00002", FightingLayout::BLOODYROAR}, // Bloody Roar 3
-	{"NM00048", FightingLayout::SOULCAL},    // Fate Unlimited Codes
-	{"NM00027", FightingLayout::TEKKEN},     // Super Dragon Ball Z
-	{"NM00029", FightingLayout::SOULCAL},    // Kinnikuman MGP
-	{"NM00035", FightingLayout::GUNDAM},     // YuYu Hakusho
-	{"NM00040", FightingLayout::SOULCAL},    // Kinnikuman MGP 2
-	{"NM00011", FightingLayout::TEKKEN},     // Pride GP 2003
+	{"NM00048", FightingLayout::FATE},       // Fate Unlimited Codes
+	{"NM00027", FightingLayout::SDBZ},       // Super Dragon Ball Z
+	{"NM00029", FightingLayout::KINNIKUMAN}, // Kinnikuman MGP 1
+	{"NM00035", FightingLayout::YUYU},       // YuYu Hakusho: Deathmatch
+	{"NM00040", FightingLayout::KINNIKUMAN}, // Kinnikuman MGP 2
+	{"NM00011", FightingLayout::PRIDEGP},    // Pride GP 2003
 	{"NM00018", FightingLayout::SIX_BUTTON}, // Capcom Fighting Jam
-	{"NM00042", FightingLayout::SOULCAL},    // Sengoku Basara X
+	{"NM00042", FightingLayout::BASARA},     // Sengoku Basara X
 	{"NM00013", FightingLayout::GUNDAM},     // Z-Gundam: A.E.U.G. vs Titans
 	{"NM00017", FightingLayout::GUNDAM},     // Z-Gundam: A.E.U.G. vs Titans DX
 	{"NM00024", FightingLayout::GUNDAM},     // Gundam SEED: Federation vs Z.A.F.T.
@@ -509,13 +423,107 @@ static const std::map<std::string, FightingLayout> s_fighting_layouts = {
 };
 
 static const std::map<std::string, RacingLayout> s_racing_layouts = {
-	{"NM00047", RacingLayout::ACEDRIVER3},   // Ace Driver 3: Final Turn
-	{"NM00010", RacingLayout::BG3},          // Battle Gear 3
-	{"NM00015", RacingLayout::BG3},          // Battle Gear 3 Tuned
-	{"NM00008", RacingLayout::WANGAN},       // Wangan Midnight
-	{"NM00005", RacingLayout::WANGAN},       // Wangan Midnight R
-	{"NM00001", RacingLayout::RRV},          // Ridge Racer V (discovery sweep)
+	{"NM00047", RacingLayout::UNIVERSAL},   // Ace Driver 3: Final Turn
+	{"NM00010", RacingLayout::BG3},         // Battle Gear 3
+	{"NM00015", RacingLayout::BG3},         // Battle Gear 3 Tuned
+	{"NM00008", RacingLayout::UNIVERSAL},   // Wangan Midnight
+	{"NM00005", RacingLayout::UNIVERSAL},   // Wangan Midnight R
+	{"NM00001", RacingLayout::UNIVERSAL},   // Ridge Racer V
+	{"NM00039", RacingLayout::UNIVERSAL},   // MotoGP
 };
+
+static const std::map<std::string, StandardLayout> s_standard_layouts = {
+	{"NM00009", StandardLayout::BASEBALL},    // Netchu Pro Baseball 2002
+	{"NM00006", StandardLayout::SMASHCOURT},  // Smash Court Pro Tournament
+	{"NM10003", StandardLayout::TECHNICBEAT}, // Technic Beat (unique unofficial gameid; NM00003 = Vampire Night, GameIndex PR #92)
+	{"NM00030", StandardLayout::GUNDAMQUIZ},  // Gundam Quiz Warrior (moved from Fighting: a quiz, not a fighter)
+};
+
+// Drum (Taiko) and twin-stick (Zoids) gameids for ResolveModeFromGameId (no per-button table).
+static constexpr const char* s_drum_games[] = {
+	"NM00023", "NM00033", "NM00038", "NM00041", "NM00044", "NM00045",
+	"NM00046", "NM00051", "NM00053", "NM00054", "NM00056", "NM00057",
+};
+static constexpr const char* s_twinstick_games[] = {"NM00016", "NM00025"};
+
+// Derive the JVS device mode from the gameid alone (jvsmode= is an optional override, see VMManager).
+JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
+{
+	if (s_racing_layouts.count(gameid))   return JVS_MODE::DRIVE;
+	if (s_fighting_layouts.count(gameid)) return JVS_MODE::FIGHTING;
+	if (s_standard_layouts.count(gameid)) return JVS_MODE::STANDARD;
+	if (s_gun_mappings.count(gameid))     return JVS_MODE::LIGHTGUN;
+	if (std::ranges::find(s_drum_games, gameid) != std::ranges::end(s_drum_games))
+		return JVS_MODE::DRUM;
+	if (std::ranges::find(s_twinstick_games, gameid) != std::ranges::end(s_twinstick_games))
+		return JVS_MODE::TWINSTICK;
+	return JVS_MODE::DEFAULT;
+}
+
+std::span<const InputBindingInfo> ACJV::GetFightingButtons()
+{
+	auto it = s_fighting_layouts.find(s_gameid);
+	if (it == s_fighting_layouts.end())
+		return {};
+	switch (it->second)
+	{
+		case FightingLayout::TEKKEN:     return s_fight_tekken;
+		case FightingLayout::SOULCAL:    return s_fight_soulcal;
+		case FightingLayout::SIX_BUTTON: return s_fight_sixbutton;
+		case FightingLayout::GUNDAM:     return s_fight_gundam;
+		case FightingLayout::BLOODYROAR: return s_fight_bloodyroar;
+		case FightingLayout::FATE:       return s_fight_fate;
+		case FightingLayout::KINNIKUMAN: return s_fight_kinnikuman;
+		case FightingLayout::PRIDEGP:    return s_fight_pridegp;
+		case FightingLayout::BASARA:     return s_fight_basara;
+		case FightingLayout::SDBZ:       return s_fight_sdbz;
+		case FightingLayout::YUYU:       return s_fight_yuyu;
+	}
+	return {};
+}
+
+std::span<const ACJV::LayoutInfo> ACJV::GetFightingLayouts()
+{
+	return s_fighting_layout_ui;
+}
+
+std::span<const InputBindingInfo> ACJV::GetStandardButtons()
+{
+	auto it = s_standard_layouts.find(s_gameid);
+	if (it == s_standard_layouts.end())
+		return {};
+	switch (it->second)
+	{
+		case StandardLayout::BASEBALL:    return s_standard_baseball;
+		case StandardLayout::SMASHCOURT:  return s_standard_smashcourt;
+		case StandardLayout::TECHNICBEAT: return s_standard_technicbeat;
+		case StandardLayout::GUNDAMQUIZ:  return s_standard_gundamquiz;
+	}
+	return {};
+}
+
+std::span<const ACJV::LayoutInfo> ACJV::GetStandardLayouts()
+{
+	return s_standard_layout_ui;
+}
+
+std::span<const InputBindingInfo> ACJV::GetRacingButtons()
+{
+	auto it = s_racing_layouts.find(s_gameid);
+	if (it == s_racing_layouts.end())
+		return {};
+	switch (it->second)
+	{
+		case RacingLayout::UNIVERSAL: return s_race_universal;
+		case RacingLayout::BG3:       return s_race_bg3;
+	}
+	return {};
+}
+
+std::span<const ACJV::RacingLayoutInfo> ACJV::GetRacingLayouts()
+{
+	return s_racing_layout_ui;
+}
 
 // Gamepad input -> JVS button state: set or clear a button bit for a player
 void ACJV::SetButtonState(u32 player, u16 mask, bool pressed)
@@ -528,13 +536,21 @@ void ACJV::SetButtonState(u32 player, u16 mask, bool pressed)
 		m_jvsButtonState[player] &= ~mask;
 }
 
+void ACJV::SetMacroState(u32 player, u32 index, bool active)
+{
+	if (player >= JVS_PLAYER_COUNT || index >= NUM_JVS_MACROS)
+		return;
+	s_jvs_macros[player][index].active = active;
+	RecomputeMacroState(player);
+}
+
 // Gamepad coin button -> increment JVS coin counter for P1 (slot 0) or P2 (slot 1)
 void ACJV::InsertCoin(u32 slot)
 {
 	if (slot == 0)
-		m_coin1++;
+		ACJV::coin[0]++;
 	else if (slot == 1)
-		m_coin2++;
+		ACJV::coin[1]++;
 }
 
 void ACJV::SetMode(JVS_MODE mode)
@@ -589,6 +605,12 @@ void ACJV::SetWheelAxis(u32 axis, float value)
 	}
 }
 
+void ACJV::SetDrumHit(u32 channel, bool pressed)
+{
+	if (channel < JVS_DRUM_CHANNEL_MAX)
+		m_jvsDrumChannels[channel] = pressed ? 0xFFFF : 0; // max -> above IN/DAI; big notes (大) emerge from hitting both sides
+}
+
 JVS_MODE ACJV::GetMode()
 {
 	return m_jvsMode;
@@ -620,8 +642,8 @@ int ACJV::GetSindenBorderThickness()
 
 void ACJV::SetScreenPos(u16 x, u16 y)
 {
-	m_jvsScreenPosX = x;
-	m_jvsScreenPosY = y;
+	m_jvsScreenPosX[0] = x;
+	m_jvsScreenPosY[0] = y;
 }
 
 // Called from VMManager on game boot. Resets all JVS state and selects per-game I/O config.
@@ -632,18 +654,27 @@ void ACJV::SetGameId(const std::string& gameid)
 	s_gameid = gameid;
 	// Clean slate: zero all input state on game switch within the emulator
 	ACUART::ResetBg3State(); // re-arm the BG3 acuart HANDLE handshake so a game RESET boots cleanly (no HANDLE ERROR)
-	m_coin1 = 0;
-	m_coin2 = 0;
+	ACJV::coin[0] = 0;
+	ACJV::coin[1] = 0;
 	m_jvsButtonState[0] = 0;
 	m_jvsButtonState[1] = 0;
 	m_jvsSystemButtonState = 0;
 	m_testButtonState = 0;
-	m_jvsScreenPosX = 0;
-	m_jvsScreenPosY = 0;
-	m_jvsLightgunDX = -1.0f;
-	m_jvsLightgunDY = -1.0f;
+	for (u32 p = 0; p < JVS_PLAYER_COUNT; p++)
+	{
+		m_jvsScreenPosX[p] = 0;
+		m_jvsScreenPosY[p] = 0;
+		m_jvsLightgunDX[p] = -1.0f;
+		m_jvsLightgunDY[p] = -1.0f;
+	}
 	std::memset(m_jvsWheelChannels, 0, sizeof(m_jvsWheelChannels));
 	std::memset(m_jvsDrumChannels, 0, sizeof(m_jvsDrumChannels));
+	for (u32 p = 0; p < JVS_PLAYER_COUNT; p++) // clear macro state; InputManager repushes masks on the input reload
+	{
+		m_jvsMacroButtonState[p] = 0;
+		for (u32 i = 0; i < NUM_JVS_MACROS; i++)
+			s_jvs_macros[p][i].active = false;
+	}
 
 	// Select per-game gun mapping, or fall back to default
 	auto it = s_gun_mappings.find(gameid);
@@ -655,25 +686,9 @@ void ACJV::SetGameId(const std::string& gameid)
 	else
 		m_gunMapping = &s_default_gun_mapping;
 
-	auto fit = s_fighting_layouts.find(gameid);
-	auto rit = s_racing_layouts.find(gameid);
-	if (fit != s_fighting_layouts.end())
-	{
-		constexpr const char* layout_names[] = {"tekken", "gundam", "6-button", "soulcalibur", "bloodyroar"};
-		Console.WriteLn("ACJV: fighting layout for %s: %s", gameid.c_str(), layout_names[static_cast<int>(fit->second)]);
-		UpdateFightingBindings(fit->second);
-	}
-	else if (rit != s_racing_layouts.end())
-	{
-		constexpr const char* racing_names[] = {"acedriver3", "bg3", "wangan", "rrv"};
-		Console.WriteLn("ACJV: racing layout for %s: %s", gameid.c_str(), racing_names[static_cast<int>(rit->second)]);
-		UpdateRacingBindings(rit->second);
-	}
-	else
-	{
-		s_active_p1_bindings = s_jvs_p1_button_bindings;
-		s_active_p2_bindings = s_jvs_p2_button_bindings;
-	}
+	// Log the running game's layout (buttons come from GetFighting/Racing/StandardButtons).
+	if (const std::string lk = GetCurrentLayoutKey(); !lk.empty())
+		Console.WriteLn("ACJV: layout for %s: %s", gameid.c_str(), lk.c_str());
 
 	// TC3 has 3 I/O boards: TSS-I/O (white flash), MIU-I/O (640x224), RAYS PCB (0xFFFF).
 	// MIU-I/O chosen: no flash artifact, calibration uses JVS trigger debounce directly.
@@ -691,30 +706,47 @@ const GunMapping& ACJV::GetGunMapping()
 	return *m_gunMapping;
 }
 
+// Per-player lightgun aim source: shared mouse by default, or the player's own controller stick when its
+// Aim Device is set to the pad (GunCon2 has_relative_binds pushes that stick's screen pos here).
+static bool s_gunAimJoystick[JVS_PLAYER_COUNT] = {};
+static float s_gunRelativeDX[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};
+static float s_gunRelativeDY[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};
+void ACJV::SetGunAimSource(u32 player, bool joystick) { if (player < JVS_PLAYER_COUNT) s_gunAimJoystick[player] = joystick; }
+void ACJV::SetGunRelativeAim(u32 player, float dx, float dy)
+{
+	if (player < JVS_PLAYER_COUNT) { s_gunRelativeDX[player] = dx; s_gunRelativeDY[player] = dy; }
+}
+
 static void UpdateLightgunFromMouse()
 {
+	float mdx, mdy;
 	const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(0);
-	float dx, dy;
-	GSTranslateWindowToDisplayCoordinates(mx, my, &dx, &dy);
+	GSTranslateWindowToDisplayCoordinates(mx, my, &mdx, &mdy);
+
 	constexpr float edge_margin = 0.01f;
-	bool on_screen = (dx >= 0.0f && dy >= 0.0f && dx < (1.0f - edge_margin) && dy < (1.0f - edge_margin));
-	if (on_screen)
-	{
-		m_jvsLightgunDX = dx;
-		m_jvsLightgunDY = dy;
-		m_jvsScreenPosX = static_cast<u16>((1.0f - dx) * 0xFFFF);
-		m_jvsScreenPosY = static_cast<u16>(dy * 0xFFFF);
-	}
-	else
-	{
-		m_jvsLightgunDX = -1.0f;
-		m_jvsLightgunDY = -1.0f;
-		m_jvsScreenPosX = 0;
-		m_jvsScreenPosY = 0;
-	}
 	const auto& gm = ACJV::GetGunMapping();
-	if (gm.sensor)
-		ACJV::SetButtonState(0, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
+	for (u32 p = 0; p < JVS_PLAYER_COUNT; p++)
+	{
+		const float dx = s_gunAimJoystick[p] ? s_gunRelativeDX[p] : mdx;
+		const float dy = s_gunAimJoystick[p] ? s_gunRelativeDY[p] : mdy;
+		const bool on_screen = (dx >= 0.0f && dy >= 0.0f && dx < (1.0f - edge_margin) && dy < (1.0f - edge_margin));
+		if (on_screen)
+		{
+			m_jvsLightgunDX[p] = dx;
+			m_jvsLightgunDY[p] = dy;
+			m_jvsScreenPosX[p] = static_cast<u16>((1.0f - dx) * 0xFFFF);
+			m_jvsScreenPosY[p] = static_cast<u16>(dy * 0xFFFF);
+		}
+		else
+		{
+			m_jvsLightgunDX[p] = -1.0f;
+			m_jvsLightgunDY[p] = -1.0f;
+			m_jvsScreenPosX[p] = 0;
+			m_jvsScreenPosY[p] = 0;
+		}
+		if (gm.sensor)
+			ACJV::SetButtonState(p, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
+	}
 }
 
 // Combine host axes into the 3 JVS analog channels (steer/gas/brake). Steering encoding is per-game.
@@ -847,8 +879,7 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 				(*dstSize) += 12;
 			}
-			// TODO: drum games (e.g. Taiko no Tatsujin)
-#if 0
+			// Taiko drum: 8 analog channels (piezo sensors), 10-bit (measured: game polls READ_INP_ANALOG 8)
 			else if(m_jvsMode == JVS_MODE::DRUM)
 			{
 				(*output++) = 0x03;                 //Analog Input
@@ -858,7 +889,6 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 				(*dstSize) += 4;
 			}
-#endif
 			// TODO: touch panel games
 #if 0
 			else if(m_jvsMode == JVS_MODE::TOUCH)
@@ -904,17 +934,19 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*output++) = m_testButtonState|(s_dip_switch_state & TESTMODE);
 			//(*output++) = (m_jvsSystemButtonState == 0x03) ? 0x80 : 0;  //Test
 
-			(*output++) = static_cast<u8>(m_jvsButtonState[0]);      //Player 1
-			(*output++) = static_cast<u8>(m_jvsButtonState[0] >> 8); //Player 1
+			const u16 p1btn = m_jvsButtonState[0] | m_jvsMacroButtonState[0];
+			(*output++) = static_cast<u8>(p1btn);      //Player 1
+			(*output++) = static_cast<u8>(p1btn >> 8); //Player 1
 			(*dstSize) += 4;
 
 			//if (m_jvsButtonState[0])
-			//	Console.WriteLn("JVS P1 buttons: %04X coin:%d", m_jvsButtonState[0], m_coin1);
+			//	Console.WriteLn("JVS P1 buttons: %04X coin:%d", m_jvsButtonState[0], ACJV::coin[0]);
 
 			if(playerCount == 2)
 			{
-				(*output++) = static_cast<u8>(m_jvsButtonState[1]);      //Player 2
-				(*output++) = static_cast<u8>(m_jvsButtonState[1] >> 8); //Player 2
+				const u16 p2btn = m_jvsButtonState[1] | m_jvsMacroButtonState[1];
+				(*output++) = static_cast<u8>(p2btn);      //Player 2
+				(*output++) = static_cast<u8>(p2btn >> 8); //Player 2
 				(*dstSize) += 2;
 			}
 		}
@@ -932,15 +964,15 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 			(*output++) = JVS_CMD_SUCCESS;
 
-			(*output++) = static_cast<u8>(((m_coin1 >> 8) & 0x3f) | (slot1Condition << 6)); //Coin 1 MSB + slot1condition
-			(*output++) = static_cast<u8>(m_coin1 & 0x00ff);                                //Coin 1 LSB
+			(*output++) = static_cast<u8>(((ACJV::coin[0] >> 8) & 0x3f) | (slot1Condition << 6)); //Coin 1 MSB + slot1condition
+			(*output++) = static_cast<u8>(ACJV::coin[0] & 0x00ff);                                //Coin 1 LSB
 
 			(*dstSize) += 3;
 
 			if(slotCount == 2)
 			{
-				(*output++) = static_cast<u8>(((m_coin2 >> 8) & 0x3f) | (slot2Condition << 6)); //Coin 2 MSB + slot2condition
-				(*output++) = static_cast<u8>(m_coin2 & 0x00ff);                                //Coin 2 LSB
+				(*output++) = static_cast<u8>(((ACJV::coin[1] >> 8) & 0x3f) | (slot2Condition << 6)); //Coin 2 MSB + slot2condition
+				(*output++) = static_cast<u8>(ACJV::coin[1] & 0x00ff);                                //Coin 2 LSB
 
 				(*dstSize) += 2;
 			}
@@ -958,8 +990,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 			//inWorkChecksum += slotCount;
 			inSize -= 3;
 
-			if(slotCount == 1) m_coin1 += (amountMSB << 8) + amountLSB;
-			if(slotCount == 2) m_coin2 += (amountMSB << 8) + amountLSB;
+			if(slotCount == 1) ACJV::coin[0] += (amountMSB << 8) + amountLSB;
+			if(slotCount == 2) ACJV::coin[1] += (amountMSB << 8) + amountLSB;
 
 			(*output++) = JVS_CMD_SUCCESS;
 
@@ -978,8 +1010,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 			//inWorkChecksum += slotCount;
 			inSize -= 3;
 
-			if(slotCount == 1) m_coin1 -= (amountMSB << 8) + amountLSB;
-			if(slotCount == 2) m_coin2 -= (amountMSB << 8) + amountLSB;
+			if(slotCount == 1) ACJV::coin[0] -= (amountMSB << 8) + amountLSB;
+			if(slotCount == 2) ACJV::coin[1] -= (amountMSB << 8) + amountLSB;
 
 			(*output++) = JVS_CMD_SUCCESS;
 
@@ -1000,10 +1032,10 @@ void do_jvs_packet(const u8* input, u8* output) {
 			{
 				JVS_ASSERT(channel == 2);
 				UpdateLightgunFromMouse();
-				(*output++) = static_cast<u8>(m_jvsScreenPosX >> 8); //Pos X MSB
-				(*output++) = static_cast<u8>(m_jvsScreenPosX);      //Pos X LSB
-				(*output++) = static_cast<u8>(m_jvsScreenPosY >> 8); //Pos Y MSB
-				(*output++) = static_cast<u8>(m_jvsScreenPosY);      //Pos Y LSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosX[0] >> 8); //Pos X MSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosX[0]);      //Pos X LSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosY[0] >> 8); //Pos Y MSB
+				(*output++) = static_cast<u8>(m_jvsScreenPosY[0]);      //Pos Y LSB
 			}
 			else if(m_jvsMode == JVS_MODE::DRUM)
 			{
@@ -1046,28 +1078,28 @@ void do_jvs_packet(const u8* input, u8* output) {
 			// - MIU-I/O (TC3): native 640x224, Y inverted (bottom-up)
 			// - RAYS PCB (TC4, Cobra, VPN): full 16-bit range 0xFFFF, Y inverted (bottom-up)
 			// pos=0 means off-screen in JVS, so on-screen values are clamped to minimum 1
+			// JVS SCREENPOS: 'channel' is the 1-based gun index (Vampire Night reads channel=1 then =2 each
+			// frame), so return that one gun's player position - gun 1 -> P1, gun 2 -> P2.
+			const u32 pl = (channel >= 1 && channel <= JVS_PLAYER_COUNT) ? (channel - 1u) : 0u;
 			u16 posX = 0, posY = 0;
-			if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX >= 0.0f)
+			if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX[pl] >= 0.0f)
 			{
 				const float scaleX = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 640.0f : 0xFFFF;
 				const float scaleY = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 224.0f : 0xFFFF;
-				posX = static_cast<u16>(m_jvsLightgunDX * scaleX);
+				posX = static_cast<u16>(m_jvsLightgunDX[pl] * scaleX);
 				if (ACJV::CurrentBoardID == RAYS_PCB || ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI)
-					posY = static_cast<u16>((1.0f - m_jvsLightgunDY) * scaleY);
+					posY = static_cast<u16>((1.0f - m_jvsLightgunDY[pl]) * scaleY);
 				else
-					posY = static_cast<u16>(m_jvsLightgunDY * scaleY);
+					posY = static_cast<u16>(m_jvsLightgunDY[pl] * scaleY);
 				if (posX == 0) posX = 1;
 				if (posY == 0) posY = 1;
 			}
-			for (u8 ch = 0; ch < channel; ch++)
-			{
-				(*output++) = static_cast<u8>(posX >> 8);
-				(*output++) = static_cast<u8>(posX);
-				(*output++) = static_cast<u8>(posY >> 8);
-				(*output++) = static_cast<u8>(posY);
-			}
+			(*output++) = static_cast<u8>(posX >> 8);
+			(*output++) = static_cast<u8>(posX);
+			(*output++) = static_cast<u8>(posY >> 8);
+			(*output++) = static_cast<u8>(posY);
 
-			(*dstSize) += 1 + (4 * channel);
+			(*dstSize) += 1 + 4; // status + one position (X, Y) for the requested gun
 		}
 		break;
 		// GPIO output — game sends byte values to control physical outputs (e.g. gun recoil solenoids).
@@ -1119,9 +1151,14 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 
 // based on https://github.com/search?q=repo%3Ajpd002/Play-%20CSys246%3A%3AProcessJvsPacket&type=code by Jean-Philip Desjardins
+// JVFIRM version n246Jvio checks against its own (mismatch stalls boot): BG3=0x210, BG3T=0x213, others 0x208.
+static u16 JvFirmwareVersion() {
+	return (s_gameid == "NM00015") ? 0x213 : (s_gameid == "NM00010") ? 0x210 : 0x208;
+}
+
 // Prime the JVS board firmware-version register when ACJV starts (BG3 Tuned polls it before any command).
 void ACJV::OnBoardStart() {
-	rdbuf_getu16()[1] = (s_gameid == "NM00015") ? 0x213 : (s_gameid == "NM00010") ? 0x210 : 0x208;
+	rdbuf_getu16()[1] = JvFirmwareVersion();
 }
 
 void do_acjv_packet() {
@@ -1130,8 +1167,7 @@ void do_acjv_packet() {
 	rd16[0] = wr16[0];
 	u16 RootPacketID = wr16[8];
 	if(rd16[0] == 0x3E6F) {
-		// JVFIRM version n246Jvio checks against its own (mismatch stalls boot): BG3=0x210, BG3T=0x213, others 0x208.
-		rd16[1]      = (s_gameid == "NM00015") ? 0x213 : (s_gameid == "NM00010") ? 0x210 : 0x208;
+		rd16[1]      = JvFirmwareVersion();
 		rd16[0x14]   = RootPacketID; // Xored with value at 0x10 in send packet, needs to be the same
 		rd16[0x21]   = wr16[0x0D];
 		rd16[0x30]  = s_dip_switch_state; // here the game polls the dip switch values?
@@ -1190,7 +1226,7 @@ void ACJV::UpdateFcaFrame()
 	rdbuf[0x85] = (u8)(brakeRaw >> 8);
 
 	// Buttons (FCA-1 digital inputs, active-high; bit assignments RE'd from I/O TEST FUN_0022bba8).
-	const u16 btn = m_jvsButtonState[0];
+	const u16 btn = m_jvsButtonState[0] | m_jvsMacroButtonState[0];
 	u8 b40 = 0, b41 = 0;
 	if (btn & JVS_BTN_3)       b40 |= 0x80; // R1       -> UP SHIFT (gear up)
 	if (btn & JVS_BTN_4)       b40 |= 0x40; // L1       -> DOWN SHIFT (gear down)
@@ -1206,7 +1242,7 @@ void ACJV::UpdateFcaFrame()
 	rdbuf[0xe2] = (s_dip_switch_state & TESTMODE) ? 0x80 : 0;
 
 	// COIN: FCA-1 coin counter @rdbuf[0xc0]; RRV credits on increase (FUN_0022aa88). Mirror our coin count.
-	rdbuf[0xc0] = (u8)m_coin1;
+	rdbuf[0xc0] = (u8)ACJV::coin[0];
 }
 	
 void ACJV::threadMemoryOutputs() 
