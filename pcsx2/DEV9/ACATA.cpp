@@ -227,7 +227,7 @@ void ACATA::handle_cmd(u16 val) {
         // here, the ata busy flag must be present at least once, on the following checks to this addr
         break;
     case ATA_C_IDENTIFY_PACKET_DEVICE:
-        Console.Warning("ATA_C_IDENTIFY_PACKET_DEVICE");
+        ACATA_LOG("ATA_C_IDENTIFY_PACKET_DEVICE");
         ACATA::cmd_handled = val;
         ACATA::cmd_handledc = 0;
         R_STATUS |= ATA_STAT_DRQ;
@@ -245,7 +245,7 @@ void ACATA::handle_cmd(u16 val) {
         ACCORE::intr(ACCORE::INTRN_ATA);
     break;
     case ATA_C_IDENTIFY_DEVICE:
-        Console.Warning("ATA_C_IDENTIFY_DEVICE");
+        ACATA_LOG("ATA_C_IDENTIFY_DEVICE");
         ata_build_identify();
         ACATA::cmd_handled = val;
         ACATA::cmd_handledc = 0;
@@ -257,6 +257,7 @@ void ACATA::handle_cmd(u16 val) {
         u32 lba = R_SECTOR | (R_LCYL << 8) | (R_HCYL << 16) | ((R_SELECT & 0x0F) << 24);
         u32 count = R_NSECTOR ? R_NSECTOR : 256;
         u32 total = count * ATA_SECTORSIZE;
+        ACATA_LOG("CMD:ATA_C_READ_SECTOR lba:%08X sectors:%02X", lba, count);
         if (!ACATA::TH::IMAGE || total > sizeof(ata_pio_buf)) {
             R_STATUS |= ATA_STAT_ERR;
             R_ERROR = ATA_ERR_ABORT;
@@ -293,10 +294,12 @@ void ACATA::handle_cmd(u16 val) {
         ACATA::cmd_handled = val;
         R_STATUS |= ATA_STAT_BUSY;
         CLRB(R_STATUS, ATA_STAT_DRQ);
+        ACATA_LOG("CMD:%s lba:%08X sectors:%02X", 
+            (val == ATA_C_READ_DMA) ? "ATA_C_READ_DMA" : "ATA_C_READ_DMA_WITHOUT_RETRIES", lba, count);
         break;
     }
     case ATA_C_SET_FEATURES:
-        Console.Warning("ATA_C_SET_FEATURES: FEATURE:%04X, R_NSECTOR:%04X, R_SECTOR:%04X, R_LCYL:%04X, R_HCYL:%04X",
+        ACATA_LOG("ATA_C_SET_FEATURES: FEATURE:%04X, R_NSECTOR:%04X, R_SECTOR:%04X, R_LCYL:%04X, R_HCYL:%04X",
             R_FEATURE, R_NSECTOR, R_SECTOR, R_LCYL, R_HCYL);
         CLRB(R_STATUS, ATA_STAT_ERR);
         R_STATUS |= ATA_STAT_READY;
@@ -313,6 +316,8 @@ void ACATA::handle_cmd(u16 val) {
         ACATA::cmd_handled = val;
         R_STATUS |= ATA_STAT_BUSY;
         CLRB(R_STATUS, ATA_STAT_DRQ);
+        ACATA_LOG("CMD:%s lba:%08X sectors:%02X", 
+            (val == ATA_C_WRITE_DMA) ? "ATA_C_WRITE_DMA" : "ATA_C_WRITE_DMA_WITHOUT_RETRIES", lba, count);
         break;
     }
     case ATA_C_SMART:
@@ -403,6 +408,7 @@ void ACATA::handle_cmd(u16 val) {
         ACCORE::intr(ACCORE::INTRN_ATA);
         break;
     case ATA_C_DEVICE_RESET:
+        ACATA_LOG("ATA_C_DEVICE_RESET");
         R_ERROR = 0x01;
         R_NSECTOR = 0x01;
         R_SECTOR = 0x01;
