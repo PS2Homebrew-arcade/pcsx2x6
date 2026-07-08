@@ -81,13 +81,11 @@ jobs:
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda
         if: steps.tag_version.outputs.new_tag && github.event_name != 'workflow_dispatch'
         with:
-          generate_release_notes: true
+          body_path: ./release-notes.md
           draft: true
           prerelease: true
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
-          body: |
-            ![DLs](https://img.shields.io/github/downloads/PS2Homebrew-arcade/pcsx2x6/${{ steps.tag_version.outputs.new_tag }}/total?style=for-the-badge&logo=github&label=Downloads&labelColor=000000)
-
+          
   # Build Everything
   # Linux
   build_linux_qt:
