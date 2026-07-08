@@ -2977,24 +2977,17 @@ void MainWindow::doGameSettings(const char* category)
 		}
 	}
 
-	// open properties for the current running file (isn't in the game list)
-	if (s_current_disc_crc == 0)
+	// open properties for the current running file (isn't in the game list).
+	// Arcade has an elf override (proverb.elf) but a valid serial (NMxxxxx) at crc 0, so key by it.
+	if (s_current_disc_crc == 0 && s_current_disc_serial.isEmpty())
 	{
 		QMessageBox::critical(this, tr("Game Properties"), tr("Game properties is unavailable for the current game."));
 		return;
 	}
 
-	// can't use serial for ELFs, because they might have a disc set
-	if (s_current_elf_override.isEmpty())
-	{
-		SettingsWindow::openGamePropertiesDialog(
-			nullptr, s_current_title.toStdString(), s_current_disc_serial.toStdString(), s_current_disc_crc, false, category);
-	}
-	else
-	{
-		SettingsWindow::openGamePropertiesDialog(
-			nullptr, s_current_title.toStdString(), std::string(), s_current_disc_crc, true, category);
-	}
+	SettingsWindow::openGamePropertiesDialog(
+		nullptr, s_current_title.toStdString(), s_current_disc_serial.toStdString(), s_current_disc_crc,
+		!s_current_elf_override.isEmpty() && s_current_disc_serial.isEmpty(), category);
 }
 
 void MainWindow::openDebugger()
