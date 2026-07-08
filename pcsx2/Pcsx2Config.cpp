@@ -2423,7 +2423,8 @@ void Pcsx2Config::ArcadeOptions::LoadSave(SettingsWrapper& wrap)
 		SettingsWrapSection("Arcade");
 		SettingsWrapEntry(ATAVerboseReads);
 		SettingsWrapEntry(RAMVerboseReads);
-		SettingsWrapEntry(ATAVerboseReads);
+		SettingsWrapEntry(SRAMVerboseReads);
+		SettingsWrapEntry(UARTVerbose);
 	}
 }
 
@@ -2436,5 +2437,6 @@ bool Pcsx2Config::ArcadeOptions::operator==(const ArcadeOptions& right) const
 {
 	return OpEqu(ATAVerboseReads) &&
 		   OpEqu(RAMVerboseReads) &&
-		   OpEqu(ATAVerboseReads);
+		   OpEqu(UARTVerbose) &&
+		   OpEqu(SRAMVerboseReads);
 }

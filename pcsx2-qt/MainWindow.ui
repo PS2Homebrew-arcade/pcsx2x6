@@ -152,6 +152,7 @@
     <addaction name="actionEnable_ACATA_Read_Logging"/>
     <addaction name="actionEnable_SRAM_Access_Logging"/>
     <addaction name="actionEnable_RAM_Access_Logging"/>
+    <addaction name="actionEnable_UART_Access_Logging"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -1100,6 +1101,14 @@
    </property>
    <property name="text">
     <string>Enable Arcade RAM Access Logging</string>
+   </property>
+  </action>
+  <action name="actionEnable_UART_Access_Logging">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Enable Arcade UART RX/TX Logging</string>
    </property>
   </action>
  </widget>
