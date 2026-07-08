@@ -1361,6 +1361,7 @@ struct Pcsx2Config
 	BITFIELD32()
 	bool
 		ArcadeSRAMVerboseReads : 1,
+		ArcadeRAMVerboseReads : 1,
 		ArcadeATAVerboseReads : 1;
 	BITFIELD_END
 

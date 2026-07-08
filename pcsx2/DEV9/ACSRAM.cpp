@@ -104,7 +104,6 @@ void ACSRAM::Write16(u32 addr, u16 val) {
     u32 T = GET_SRAM_OFF(addr);
     if (T < ACSRAM_MAX_SIZE) {
         ACSRAM_LOG("write16 [%04X]=%02X", T, val);
-        //Console.WriteLn(Color_StrongCyan, "%-16s %04X = %02X", __FUNCTION__, T, val);
         ACSRAM::buffer[T] = val;
     } else OOB_REPORT(T);
 }

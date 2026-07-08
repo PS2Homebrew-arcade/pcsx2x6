@@ -259,7 +259,7 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
             atapi_complete_nodata();
             break;
         }
-        ACATA_LOG("ATAPI READ_10 lba:%08X sectors:%02X dma:%s", transf_lba, nsec, ACATA_ISDMA);
+        ACATA_LOG("ATAPI READ_10 lba:%08X sectors:%02X dma:%d", transf_lba, nsec, ACATA_ISDMA);
         if (ACATA_ISDMA) {
             u32 total = nsec * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
             bool ok = false;

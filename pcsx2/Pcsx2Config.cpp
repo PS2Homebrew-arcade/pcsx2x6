@@ -2028,6 +2028,7 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 
 	SettingsWrapBitBool(ArcadeATAVerboseReads);
 	SettingsWrapBitBool(ArcadeSRAMVerboseReads);
+	SettingsWrapBitBool(ArcadeRAMVerboseReads);
 
 	// Process various sub-components:
 

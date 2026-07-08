@@ -407,8 +407,9 @@ void MainWindow::connectSignals()
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableFileLogging, "Logging", "EnableFileLogging", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableLogTimestamps, "Logging", "EnableTimestamps", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableCDVDVerboseReads, "EmuCore", "CdvdVerboseReads", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_ACATA_Read_Logging, "EmuCore", "ArcadeATAVerboseReads", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_SRAM_Access_Logging, "EmuCore", "ArcadeSRAMVerboseReads", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_ACATA_Read_Logging, "Arcade/Debug", "ArcadeATAVerboseReads", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_SRAM_Access_Logging, "Arcade/Debug", "ArcadeSRAMVerboseReads", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_RAM_Access_Logging, "Arcade/Debug", "ArcadeRAMVerboseReads", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionSaveBlockDump, "EmuCore", "CdvdDumpBlocks", false);
 	m_ui.actionShowAdvancedSettings->setChecked(QtHost::ShouldShowAdvancedSettings());
 	connect(m_ui.actionSaveBlockDump, &QAction::toggled, this, &MainWindow::onBlockDumpActionToggled);

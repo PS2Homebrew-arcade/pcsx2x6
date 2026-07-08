@@ -151,6 +151,7 @@
     <addaction name="actionEnableCDVDVerboseReads"/>
     <addaction name="actionEnable_ACATA_Read_Logging"/>
     <addaction name="actionEnable_SRAM_Access_Logging"/>
+    <addaction name="actionEnable_RAM_Access_Logging"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -1082,7 +1083,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Enable ACATA Read Logging</string>
+    <string>Enable Arcade ATA Read Logging</string>
    </property>
   </action>
   <action name="actionEnable_SRAM_Access_Logging">
@@ -1090,7 +1091,15 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Enable SRAM Access Logging</string>
+    <string>Enable Arcade SRAM Access Logging</string>
+   </property>
+  </action>
+  <action name="actionEnable_RAM_Access_Logging">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Enable Arcade RAM Access Logging</string>
    </property>
   </action>
  </widget>
