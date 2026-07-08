@@ -6,7 +6,7 @@
 #include <cstring>
 
 #include "Config.h"
-#define ACRAM_LOG(fmt, ...) if (EmuConfig.ArcadeRAMVerboseReads) Console.WriteLn(Color_Gray, "ACRAM:" fmt __VA_OPT__(,) __VA_ARGS__)
+#define ACRAM_LOG(fmt, ...) if (EmuConfig.ArcadeLogs.RAMVerboseReads) Console.WriteLn(Color_Gray, "ACRAM:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 #define OOB_REPORT(T) Console.Error("%s: out of bound index: %08X", __FUNCTION__, T)
 #define GET_RAM_OFF(addr) (((addr) - ACRAM_ADDR_BASE) / 2) // u8 buffer on u16 MMIO, halve the address to get real offset

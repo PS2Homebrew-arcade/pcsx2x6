@@ -1358,12 +1358,11 @@ struct Pcsx2Config
 
 	// ------------------------------------------------------------------------
 
-	BITFIELD32()
-	bool
-		ArcadeSRAMVerboseReads : 1,
-		ArcadeRAMVerboseReads : 1,
-		ArcadeATAVerboseReads : 1;
-	BITFIELD_END
+	struct _ArcadeLogs {
+		bool SRAMVerboseReads;
+		bool RAMVerboseReads;
+		bool ATAVerboseReads;
+	} ArcadeLogs;
 
 	BITFIELD32()
 	bool

@@ -25,7 +25,7 @@
 #include "ACATA_internal.h"
 #include "ACATAPI.h"
 
-#define ACATA_LOG(fmt, ...) if (EmuConfig.ArcadeATAVerboseReads) Console.WriteLn(Color_Gray, "ACATA:" fmt __VA_OPT__(,) __VA_ARGS__)
+#define ACATA_LOG(fmt, ...) if (EmuConfig.ArcadeLogs.ATAVerboseReads) Console.WriteLn(Color_Gray, "ACATA:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 #define ACATA_R_DATA                0x16000000  // Read/Write PIO data bytes
 #define ACATA_R_FEATURE             0x16010000  // [W] Used to control command specific interface features.

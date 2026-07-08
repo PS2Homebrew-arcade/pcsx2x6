@@ -529,6 +529,11 @@ void VMManager::UpdateLoggingSettings(SettingsInterface& si)
 	TraceLogging.IOP.Memory.Enabled = true;
 	TraceLogging.SIF.Enabled = true;
 
+
+	EmuConfig.ArcadeLogs.ATAVerboseReads  = si.GetBoolValue("Logging", "ArcadeATAVerboseReads", false);
+	EmuConfig.ArcadeLogs.SRAMVerboseReads = si.GetBoolValue("Logging", "ArcadeSRAMVerboseReads", false);
+	EmuConfig.ArcadeLogs.RAMVerboseReads  = si.GetBoolValue("Logging", "ArcadeRAMVerboseReads", false);
+
 	// Input Recording Logs
 	ConsoleLogging.recordingConsole.Enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	ConsoleLogging.controlInfo.Enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableControllerLogs", false);
@@ -554,6 +559,10 @@ void VMManager::SetDefaultLoggingSettings(SettingsInterface& si)
 	si.SetBoolValue("Logging", "EnableIOPConsole", false);
 	si.SetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	si.SetBoolValue("Logging", "EnableControllerLogs", false);
+	
+	si.SetBoolValue("Logging", "ArcadeATAVerboseReads", false);
+	si.SetBoolValue("Logging", "ArcadeSRAMVerboseReads", false);
+	si.SetBoolValue("Logging", "ArcadeRAMVerboseReads", false);
 
 	EmuConfig.Trace.Enabled = false;
 	EmuConfig.Trace.EE.bitset = 0;

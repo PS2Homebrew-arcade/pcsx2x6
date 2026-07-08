@@ -403,13 +403,13 @@ void MainWindow::connectSignals()
 #endif
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableEEConsoleLogging, "Logging", "EnableEEConsole", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableIOPConsoleLogging, "Logging", "EnableIOPConsole", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_ACATA_Read_Logging, "Logging",  "ArcadeATAVerboseReads", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_SRAM_Access_Logging, "Logging", "ArcadeSRAMVerboseReads", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_RAM_Access_Logging, "Logging",  "ArcadeRAMVerboseReads", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableLogWindow, "Logging", "EnableLogWindow", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableFileLogging, "Logging", "EnableFileLogging", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableLogTimestamps, "Logging", "EnableTimestamps", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableCDVDVerboseReads, "EmuCore", "CdvdVerboseReads", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_ACATA_Read_Logging, "Arcade/Debug", "ArcadeATAVerboseReads", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_SRAM_Access_Logging, "Arcade/Debug", "ArcadeSRAMVerboseReads", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnable_RAM_Access_Logging, "Arcade/Debug", "ArcadeRAMVerboseReads", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionSaveBlockDump, "EmuCore", "CdvdDumpBlocks", false);
 	m_ui.actionShowAdvancedSettings->setChecked(QtHost::ShouldShowAdvancedSettings());
 	connect(m_ui.actionSaveBlockDump, &QAction::toggled, this, &MainWindow::onBlockDumpActionToggled);
