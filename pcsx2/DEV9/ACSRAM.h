@@ -10,7 +10,7 @@
 #define ACSRAM_RANGE     0x1250
 #define ACSRAM_MAX_SIZE  _32kb // size of the SRAM
 
-#define ACSRAM_LOG(fmt, ...) if (EmuConfig.ArcadeLogs.SRAMVerboseReads) Console.WriteLn(Color_Gray, "SRAM:" fmt __VA_OPT__(,) __VA_ARGS__)
+#define ACSRAM_LOG(fmt, ...) if (EmuConfig.Arcade.SRAMVerboseReads) Console.WriteLn(Color_Gray, "SRAM:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 namespace ACSRAM
 {

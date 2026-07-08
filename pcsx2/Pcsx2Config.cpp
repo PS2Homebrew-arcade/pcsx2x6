@@ -2034,6 +2034,7 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 	GS.LoadSave(wrap);
 	SPU2.LoadSave(wrap);
 	DEV9.LoadSave(wrap);
+	Arcade.LoadSave(wrap);
 	Gamefixes.LoadSave(wrap);
 	Profiler.LoadSave(wrap);
 	Savestate.LoadSave(wrap);
@@ -2413,4 +2414,27 @@ std::string EmuFolders::GetOverridableResourcePath(std::string_view name)
 	}
 
 	return upath;
+}
+
+
+void Pcsx2Config::ArcadeOptions::LoadSave(SettingsWrapper& wrap)
+{
+	{
+		SettingsWrapSection("Arcade");
+		SettingsWrapEntry(ATAVerboseReads);
+		SettingsWrapEntry(RAMVerboseReads);
+		SettingsWrapEntry(ATAVerboseReads);
+	}
+}
+
+bool Pcsx2Config::ArcadeOptions::operator!=(const ArcadeOptions& right) const
+{
+	return !this->operator==(right);
+}
+
+bool Pcsx2Config::ArcadeOptions::operator==(const ArcadeOptions& right) const
+{
+	return OpEqu(ATAVerboseReads) &&
+		   OpEqu(RAMVerboseReads) &&
+		   OpEqu(ATAVerboseReads);
 }

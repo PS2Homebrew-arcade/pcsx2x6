@@ -133,7 +133,7 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 	m_ui.systemPageLayout->addStretch(1); // top-pack so the page doesn't inherit the tallest page's height
 
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(m_dialog->getProfileSettingsInterface(), m_ui.suppressDaemon,
-		ACJV::CONFIG_SECTION, "SuppressDaemon", true);
+		"Arcade", "SuppressDaemon", true);
 
 	// Item order MUST match the QStackedWidget page order in the .ui.
 	m_ui.pageSelector->addItem(tr("System"));
