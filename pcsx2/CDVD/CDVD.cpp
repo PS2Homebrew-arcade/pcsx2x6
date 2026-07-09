@@ -2620,8 +2620,9 @@ static void cdvdWrite16(u8 rt) // SCOMMAND
 				break;
 
 			case 0x13: // sceCdWriteILinkID (8:1)
+				Console.Warning("INVESTIGATE: sceCdWriteILinkID called");
 				SetSCMDResultSize(1);
-				cdvdWriteILinkID(&cdvd.SCMDParamBuff[1]);
+				cdvdWriteILinkID(&cdvd.SCMDParamBuff[0]);
 				break;
 
 			case 0x14: // CdCtrlAudioDigitalOut (1:1)
