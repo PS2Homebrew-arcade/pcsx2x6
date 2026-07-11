@@ -192,6 +192,7 @@ static bool s_elf_executed = false;
 static std::string s_elf_override;
 static std::string s_acgame;
 static std::string s_acgame_serial;
+std::string ArcadeiLinkID;
 static std::string s_input_profile_name;
 static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
@@ -1350,6 +1351,12 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string s_acmedia, s_imgname, s_serial;
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc");
+				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
+				if (!ArcadeiLinkID.empty() &&
+					(ArcadeiLinkID == "ASIA4" || ArcadeiLinkID == "ASIA5" || ArcadeiLinkID == "JAPAN")) {
+					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
+					return false;
+				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
 				s_title = s_serial = INI.GetStringValue("game", "name");
 				s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
 				s_acgame_serial = s_serial;
@@ -1874,6 +1881,7 @@ void VMManager::Shutdown(bool save_resume_state)
 	s_elf_override = {};
 	s_acgame = {};
 	s_acgame_serial = {};
+	ArcadeiLinkID = {};
 	PS2CLK = PS2CLK_DEFAULT;
 	PSXCLK = 36864000;
 	s_sys256_mode = false;

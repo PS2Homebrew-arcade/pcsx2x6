@@ -2595,6 +2595,16 @@ static void cdvdWrite16(u8 rt) // SCOMMAND
 			case 0x12: // sceCdReadILinkId (0:9)
 				SetSCMDResultSize(9);
 				cdvdReadILinkID(&cdvd.SCMDResultBuff[1]);
+				extern std::string ArcadeiLinkID;
+				if (!ArcadeiLinkID.empty()) {
+					constexpr u8 s256Region_ASIA4[8] = {0x32, 0x1F, 0xC7, 0xFA, 0xD6, 0xEE, 0xF0, 0x1C};
+					constexpr u8 s256Region_ASIA5[8] = {0x41, 0x46, 0x53, 0x2F, 0x1E, 0xFD, 0x0F, 0xE0};
+					constexpr u8 s256Region_JAPAN[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+					if (ArcadeiLinkID == "ASIA4") std::memcpy(cdvd.SCMDResultBuff, s256Region_ASIA4, 8);
+					else if (ArcadeiLinkID == "ASIA5") std::memcpy(cdvd.SCMDResultBuff, s256Region_ASIA5, 8);
+					else if (ArcadeiLinkID == "JAPAN") std::memcpy(cdvd.SCMDResultBuff, s256Region_JAPAN, 8);
+					break;
+				}
 				if ((!cdvd.SCMDResultBuff[3]) && (!cdvd.SCMDResultBuff[4])) // nvm file is missing correct iLinkId, return hardcoded one
 				{
 					cdvd.SCMDResultBuff[0] = 0x00;
@@ -2610,8 +2620,9 @@ static void cdvdWrite16(u8 rt) // SCOMMAND
 				break;
 
 			case 0x13: // sceCdWriteILinkID (8:1)
+				Console.Warning("INVESTIGATE: sceCdWriteILinkID called");
 				SetSCMDResultSize(1);
-				cdvdWriteILinkID(&cdvd.SCMDParamBuff[1]);
+				cdvdWriteILinkID(&cdvd.SCMDParamBuff[0]);
 				break;
 
 			case 0x14: // CdCtrlAudioDigitalOut (1:1)
