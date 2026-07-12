@@ -197,6 +197,7 @@ namespace Patch
 	extern u32 GetAllActivePatchesCount();
 
 	extern bool IsGloballyToggleablePatch(const PatchInfo& patch_info);
+	extern bool IsGlobalSettingPatch(const PatchInfo& patch_info); // WS/NI: default follows a global toggle
 
 	extern const char* PlaceToString(std::optional<patch_place_type> place);
 } // namespace Patch

@@ -312,12 +312,16 @@ NM00045:
   bootprog: TEALOAD
   media: DVD
   input: drum
+  gsHWFixes:
+    alignSprite: 1
 NM00046:
   name: Taiko Drum Master 11 - Asian Edition
   region: System256
   bootprog: TEBLOAD
   media: DVD
   input: drum
+  gsHWFixes:
+    alignSprite: 1
 NM00047:
   name: Ace Driver 3 - Final Turn
   region: System256
@@ -350,12 +354,16 @@ NM00053:
   bootprog: TECLOAD
   media: HDD
   input: drum
+  gsHWFixes:
+    alignSprite: 1
 NM00054:
   name: Taiko Drum Master 12 - Asian Edition
   region: System256
   bootprog: TEDLOAD
   media: HDD
   input: drum
+  gsHWFixes:
+    alignSprite: 1
 NM00056:
   name: Taiko Drum Master 13
   region: System256

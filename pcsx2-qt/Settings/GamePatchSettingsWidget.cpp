@@ -174,9 +174,9 @@ void GamePatchSettingsWidget::reloadList()
 				{
 					check_state = Qt::CheckState::Checked;
 				}
-				else
+				else // WS/NI follow the global toggle (partial); other arcade patches default on
 				{
-					check_state = Qt::CheckState::PartiallyChecked;
+					check_state = Patch::IsGlobalSettingPatch(pi) ? Qt::CheckState::PartiallyChecked : Qt::CheckState::Checked;
 				}
 			}
 

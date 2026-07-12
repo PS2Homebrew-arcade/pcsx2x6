@@ -1017,11 +1017,11 @@ std::string VMManager::GetSerialForGameSettings()
 bool VMManager::UpdateGameSettingsLayer()
 {
 	std::unique_ptr<INISettingsInterface> new_interface;
-	if (s_disc_crc != 0)
+	if (s_disc_crc != 0 || !s_acgame.empty()) // arcade: crc 0, keyed by the .acgame gameid
 	{
 		const std::string game_serial = GetSerialForGameSettings();
 		std::string filename(GetGameSettingsPath(game_serial, s_disc_crc));
-		if (!FileSystem::FileExists(filename.c_str()))
+		if (!FileSystem::FileExists(filename.c_str()) && s_acgame.empty()) // arcade: only {gameid}_0, no shared crc-only fallback
 		{
 			if (!game_serial.empty())
 				filename = GetGameSettingsPath(game_serial, 0);
@@ -1139,6 +1139,10 @@ void VMManager::UpdateDiscDetails(bool booting)
 		// If we're booting an ELF, use its CRC, not the disc (if any).
 		if (!s_elf_override.empty())
 			s_disc_crc = cdvdGetElfCRC(s_elf_override);
+
+		// Arcade identity is crc 0 for every media (CD/DVD/HDD); the .acgame gameid is the serial.
+		if (!s_acgame.empty())
+			s_disc_crc = 0;
 
 		if (!booting && s_disc_serial == old_serial && s_disc_crc == old_crc)
 		{
@@ -1269,7 +1273,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	}
 
 	elfo.LoadHeaders();
-	s_current_crc = elfo.GetCRC();
+	s_current_crc = s_acgame.empty() ? elfo.GetCRC() : 0; // arcade: identity is the .acgame (crc 0), proverb.elf or boot.elf alike
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
