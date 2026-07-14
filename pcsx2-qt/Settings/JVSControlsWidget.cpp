@@ -136,7 +136,7 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 		"Arcade", "SuppressDaemon", true);
 
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(m_dialog->getProfileSettingsInterface(), m_ui.outputsEnable,
-		ACJV::CONFIG_SECTION, "OutputsEnabled", true);
+		ACJV::CONFIG_SECTION, "OutputsEnabled", false);
 
 	#ifndef _WIN32
 	m_ui.outputsEnable->hide();
