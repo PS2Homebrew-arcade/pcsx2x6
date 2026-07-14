@@ -226,8 +226,18 @@
                     <property name="text"><string>Suppress DAEMON security thread</string></property>
                     <property name="toolTip"><string>Avoids dongle I/O errors by suppressing the DAEMON driver security dongle check routine</string></property>
                    </widget>
-                  </item>
-                 </layout>
+				  </item>
+				    <item row="1" column="0" colspan="2">
+					    <widget class="QCheckBox" name="outputsEnable">
+						    <property name="text">
+							    <string>Enable Outputs</string>
+						    </property>
+						    <property name="toolTip">
+							    <string>Enable Outputs, currently only Lightgun recoil outputs are supported using Mamehooker-compatible messaging</string>
+						    </property>
+					    </widget>
+				    </item>
+				 </layout>
                 </widget>
                </item>
               </layout>

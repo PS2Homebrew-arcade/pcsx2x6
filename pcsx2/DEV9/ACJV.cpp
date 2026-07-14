@@ -81,6 +81,7 @@ static std::atomic<int> s_sinden_border_mode{0};
 static std::atomic<int> s_sinden_border_thickness{10};
 static std::string s_gameid;
 
+static std::atomic<bool> s_outputs_enabled{false};
 static int s_last_recoil = 0;
 static u32 s_p1LastAmmo = 0; //INT32_MAX;
 static u32 s_p2LastAmmo = 0; //INT32_MAX;
@@ -265,6 +266,7 @@ void ACJV::LoadConfig(const SettingsInterface& si)
 	s_sinden_border_enabled = si.GetBoolValue(CONFIG_SECTION, "SindenBorderEnabled", false);
 	s_sinden_border_mode = si.GetIntValue(CONFIG_SECTION, "SindenBorderMode", 0);
 	s_sinden_border_thickness = si.GetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);
+	s_outputs_enabled = si.GetBoolValue(CONFIG_SECTION, "OutputsEnabled", false);
 }
 
 void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface& src_si, bool copy_settings, bool copy_bindings)
@@ -281,6 +283,7 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "AnalogSensitivity");
 		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "TriggerDeadzone");
 		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "InvertSteering");
+		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "OutputsEnabled");
 	}
 
 	if (copy_bindings)
@@ -342,6 +345,7 @@ void ACJV::SetDefaultConfiguration(SettingsInterface& si)
 	si.SetBoolValue(CONFIG_SECTION, "SindenBorderEnabled", false);
 	si.SetIntValue(CONFIG_SECTION, "SindenBorderMode", 0);
 	si.SetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);
+	si.SetBoolValue(CONFIG_SECTION, "OutputsEnabled", false);
 }
 
 // The game reading the JVS board: return the requested word from its read buffer (rdbuf).
@@ -563,8 +567,17 @@ void ACJV::SetMode(JVS_MODE mode)
 
 		#ifdef _WIN32
 		// start recoil output server (currently using only Windows implementation, NetOutputs TODO)
-		Console.WriteLn("OUTPUTS: using Windows outputs.");
-		Outputs = new CWinOutputs(); 
+
+		if (ACJV::IsOutputsEnabled())
+		{
+			Console.WriteLn("OUTPUTS: Outputs enabled, starting Windows outputs.");
+			Outputs = new CWinOutputs();
+		}
+		else
+		{
+			Console.WriteLn("OUTPUTS: Outputs disabled.");
+			Outputs = nullptr;
+		}
 		#endif
 
 		// Initialize outputs
@@ -638,6 +651,11 @@ int ACJV::GetSindenBorderMode()
 int ACJV::GetSindenBorderThickness()
 {
 	return s_sinden_border_thickness;
+}
+
+bool ACJV::IsOutputsEnabled()
+{
+	return s_outputs_enabled;
 }
 
 void ACJV::SetScreenPos(u16 x, u16 y)
