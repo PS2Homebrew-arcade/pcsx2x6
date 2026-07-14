@@ -21,111 +21,273 @@
       </property>
       <layout class="QVBoxLayout" name="scrollLayout">
 
-       <!-- Hardware (full width) -->
+       <!-- View selector: Bindings / Settings (mirrors the Controller tab's header) -->
        <item>
-        <widget class="QGroupBox" name="hardwareGroup">
-         <property name="title"><string>Hardware</string></property>
-         <layout class="QGridLayout" name="hardwareLayout" columnstretch="0,1">
-          <item row="0" column="0">
-           <widget class="QLabel" name="boardTypeLabel">
-            <property name="text"><string>JVS Board Type:</string></property>
-            <property name="buddy"><cstring>boardType</cstring></property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="boardType">
-            <property name="enabled"><bool>false</bool></property>
-            <property name="toolTip"><string>Auto-detected from the game. Manual selection is not yet supported.</string></property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-
-       <!-- DIP Switches (left) + System Buttons (right) -->
-       <item>
-        <layout class="QHBoxLayout" name="middleRow">
+        <layout class="QHBoxLayout" name="viewSelectorRow">
          <item>
-          <widget class="QGroupBox" name="dipSwitchGroup">
-           <property name="title"><string>DIP Switches</string></property>
-           <layout class="QGridLayout" name="dipSwitchLayout" columnstretch="1,0">
-            <item row="0" column="0">
-             <widget class="QCheckBox" name="testMode">
-              <property name="text"><string>Test Mode</string></property>
-              <property name="toolTip"><string>Enter the machine's diagnostic test menu</string></property>
-             </widget>
-            </item>
-            <item row="0" column="1">
-             <widget class="InputBindingWidget" name="toggleTestMode">
-              <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
-              <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
-              <property name="text"><string/></property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QCheckBox" name="videoVoltage">
-              <property name="text"><string>Video Voltage</string></property>
-              <property name="toolTip"><string>Video output voltage level (3.3V when ON, 5V when OFF)</string></property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="InputBindingWidget" name="toggleVideoVoltage">
-              <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
-              <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
-              <property name="text"><string/></property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QCheckBox" name="monitorSyncFrequency">
-              <property name="text"><string>Monitor Sync Frequency</string></property>
-              <property name="toolTip"><string>Monitor sync frequency (31kHz when ON, 15kHz when OFF)</string></property>
-             </widget>
-            </item>
-            <item row="2" column="1">
-             <widget class="InputBindingWidget" name="toggleMonitorSyncFrequency">
-              <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
-              <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
-              <property name="text"><string/></property>
-             </widget>
-            </item>
-            <item row="3" column="0">
-             <widget class="QCheckBox" name="videoSyncSplit">
-              <property name="text"><string>Video Sync Split</string></property>
-              <property name="toolTip"><string>Video sync signal mode (separate H/V sync when ON, composite sync when OFF)</string></property>
-             </widget>
-            </item>
-            <item row="3" column="1">
-             <widget class="InputBindingWidget" name="toggleVideoSyncSplit">
-              <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
-              <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
-              <property name="text"><string/></property>
-             </widget>
-            </item>
-           </layout>
+          <widget class="QToolButton" name="viewBindings">
+           <property name="text"><string>Bindings</string></property>
+           <property name="icon">
+            <iconset theme="controller-line"><normaloff>.</normaloff>.</iconset>
+           </property>
+           <property name="checkable"><bool>true</bool></property>
+           <property name="checked"><bool>true</bool></property>
+           <property name="autoExclusive"><bool>true</bool></property>
+           <property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property>
+           <property name="autoRaise"><bool>true</bool></property>
           </widget>
          </item>
          <item>
-          <widget class="QGroupBox" name="systemButtonsGroup">
-           <property name="title"><string>System Buttons</string></property>
-           <layout class="QGridLayout" name="systemButtonsLayout" columnstretch="1,0">
-           </layout>
+          <widget class="QToolButton" name="viewSettings">
+           <property name="text"><string>Settings</string></property>
+           <property name="icon">
+            <iconset theme="checkbox-multiple-blank-line"><normaloff>.</normaloff>.</iconset>
+           </property>
+           <property name="checkable"><bool>true</bool></property>
+           <property name="autoExclusive"><bool>true</bool></property>
+           <property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property>
+           <property name="autoRaise"><bool>true</bool></property>
           </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="viewMacros">
+           <property name="text"><string>Macros</string></property>
+           <property name="icon">
+            <iconset theme="flashlight-line"><normaloff>.</normaloff>.</iconset>
+           </property>
+           <property name="checkable"><bool>true</bool></property>
+           <property name="autoExclusive"><bool>true</bool></property>
+           <property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property>
+           <property name="autoRaise"><bool>true</bool></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="viewSelectorSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+          </spacer>
          </item>
         </layout>
        </item>
 
-       <!-- System Settings (full width) -->
+       <!-- Outer view stack: [0] Bindings (hardware + per-mode pages), [1] Settings -->
        <item>
-        <widget class="QGroupBox" name="systemSettingsGroup">
-         <property name="title"><string>System Settings</string></property>
-         <layout class="QGridLayout" name="systemSettingsLayout" columnstretch="1,0">
-          <item row="0" column="0" colspan="2">
-           <widget class="QCheckBox" name="suppressDaemon">
-            <property name="text"><string>Suppress DAEMON security thread</string></property>
-            <property name="toolTip"><string>Avoids dongle I/O errors by suppressing the DAEMON driver security dongle check routine</string></property>
-           </widget>
-          </item>
-         </layout>
+        <widget class="QStackedWidget" name="viewStack">
+         <widget class="QWidget" name="bindingsView">
+          <layout class="QVBoxLayout" name="bindingsViewLayout">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+
+           <!-- Hardware + input-page selector (always visible in Bindings view) -->
+           <item>
+            <layout class="QHBoxLayout" name="hardwareRow">
+             <item>
+              <spacer name="hwLeftSpacer">
+               <property name="orientation"><enum>Qt::Horizontal</enum></property>
+               <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="hardwareGroup">
+             <property name="title"><string>Hardware</string></property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <layout class="QGridLayout" name="hardwareLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="boardTypeLabel">
+                <property name="text"><string>JVS Board Type:</string></property>
+                <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+                <property name="buddy"><cstring>boardType</cstring></property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="boardType">
+                <property name="enabled"><bool>false</bool></property>
+                <property name="minimumWidth"><number>200</number></property>
+                <property name="maximumWidth"><number>200</number></property>
+                <property name="toolTip"><string>Auto-detected from the game. Manual selection is not yet supported.</string></property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="pageLabel">
+                <property name="text"><string>JVS Mode:</string></property>
+                <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+                <property name="buddy"><cstring>pageSelector</cstring></property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="pageSelector">
+                <property name="minimumWidth"><number>200</number></property>
+                <property name="maximumWidth"><number>200</number></property>
+                <property name="toolTip"><string>Choose which JVS input group to configure (auto-selected from the game's mode).</string></property>
+               </widget>
+              </item>
+             </layout>
+              </widget>
+             </item>
+             <item>
+              <spacer name="hwRightSpacer">
+               <property name="orientation"><enum>Qt::Horizontal</enum></property>
+               <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+
+           <!-- Per-mode input pages -->
+           <item>
+            <widget class="QStackedWidget" name="pageStack">
+             <widget class="QWidget" name="systemPage">
+              <layout class="QVBoxLayout" name="systemPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+               <item>
+                <layout class="QHBoxLayout" name="middleRow">
+                 <item>
+                  <widget class="QGroupBox" name="dipSwitchGroup">
+                   <property name="title"><string>DIP Switches</string></property>
+                   <layout class="QGridLayout" name="dipSwitchLayout" columnstretch="1,0">
+                    <item row="0" column="0">
+                     <widget class="QCheckBox" name="testMode">
+                      <property name="text"><string>Test Mode</string></property>
+                      <property name="toolTip"><string>Enter the machine's diagnostic test menu</string></property>
+                     </widget>
+                    </item>
+                    <item row="0" column="1">
+                     <widget class="InputBindingWidget" name="toggleTestMode">
+                      <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
+                      <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
+                      <property name="text"><string/></property>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QCheckBox" name="videoVoltage">
+                      <property name="text"><string>Video Voltage</string></property>
+                      <property name="toolTip"><string>Video output voltage level (3.3V when ON, 5V when OFF)</string></property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="InputBindingWidget" name="toggleVideoVoltage">
+                      <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
+                      <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
+                      <property name="text"><string/></property>
+                     </widget>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QCheckBox" name="monitorSyncFrequency">
+                      <property name="text"><string>Monitor Sync Frequency</string></property>
+                      <property name="toolTip"><string>Monitor sync frequency (31kHz when ON, 15kHz when OFF)</string></property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="InputBindingWidget" name="toggleMonitorSyncFrequency">
+                      <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
+                      <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
+                      <property name="text"><string/></property>
+                     </widget>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QCheckBox" name="videoSyncSplit">
+                      <property name="text"><string>Video Sync Split</string></property>
+                      <property name="toolTip"><string>Video sync signal mode (separate H/V sync when ON, composite sync when OFF)</string></property>
+                     </widget>
+                    </item>
+                    <item row="3" column="1">
+                     <widget class="InputBindingWidget" name="toggleVideoSyncSplit">
+                      <property name="minimumSize"><size><width>225</width><height>0</height></size></property>
+                      <property name="maximumSize"><size><width>225</width><height>16777215</height></size></property>
+                      <property name="text"><string/></property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QGroupBox" name="systemButtonsGroup">
+                   <property name="title"><string>System Buttons</string></property>
+                   <layout class="QGridLayout" name="systemButtonsLayout" columnstretch="1,0">
+                   </layout>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="systemSettingsGroup">
+                 <property name="title"><string>System Settings</string></property>
+                 <layout class="QGridLayout" name="systemSettingsLayout" columnstretch="1,0">
+                  <item row="0" column="0" colspan="2">
+                   <widget class="QCheckBox" name="suppressDaemon">
+                    <property name="text"><string>Suppress DAEMON security thread</string></property>
+                    <property name="toolTip"><string>Avoids dongle I/O errors by suppressing the DAEMON driver security dongle check routine</string></property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="fightingPage">
+              <layout class="QVBoxLayout" name="fightingPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="racingPage">
+              <layout class="QVBoxLayout" name="racingPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="drumPage">
+              <layout class="QVBoxLayout" name="drumPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="twinstickPage">
+              <layout class="QVBoxLayout" name="twinstickPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="lightgunPage">
+              <layout class="QVBoxLayout" name="lightgunPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="standardPage">
+              <layout class="QVBoxLayout" name="standardPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="settingsView">
+          <layout class="QVBoxLayout" name="settingsViewLayout">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="macrosView">
+          <layout class="QVBoxLayout" name="macrosViewLayout">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+          </layout>
+         </widget>
         </widget>
        </item>
 
@@ -151,7 +313,11 @@
   </customwidget>
  </customwidgets>
  <tabstops>
+  <tabstop>viewBindings</tabstop>
+  <tabstop>viewSettings</tabstop>
+  <tabstop>viewMacros</tabstop>
   <tabstop>boardType</tabstop>
+  <tabstop>pageSelector</tabstop>
   <tabstop>testMode</tabstop>
   <tabstop>toggleTestMode</tabstop>
   <tabstop>videoVoltage</tabstop>

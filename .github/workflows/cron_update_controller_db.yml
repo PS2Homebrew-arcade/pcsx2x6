@@ -2,11 +2,11 @@ name: 🏭 Update Controller Database
 
 on:
   schedule:
-    - cron: "0 16 * * 1" # every monday @ 12pm EST - https://crontab.guru/#0_16_*_*_1
+    - cron: "0 16 1 * *"
 
 jobs:
   update-controller-db:
-    if: github.repository == 'PCSX2/pcsx2'
+    if: github.repository == 'PS2Homebrew-arcade/pcsx2x6'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -22,9 +22,7 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
           title: "PAD: Update to latest controller database"
-          commit-message: "[ci skip] PAD: Update to latest controller database."
-          committer: "PCSX2 Bot <PCSX2Bot@users.noreply.github.com>"
-          author: "PCSX2 Bot <PCSX2Bot@users.noreply.github.com>"
-          body: "Weekly automatic update of SDL Controller DB."
+          commit-message: "PAD: Update to latest controller database."
+          body: "[ci skip] Monthly automatic update of SDL Controller DB."
           branch: update-controller-db
           delete-branch: true

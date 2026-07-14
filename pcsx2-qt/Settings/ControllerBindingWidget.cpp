@@ -1051,10 +1051,20 @@ QIcon USBDeviceWidget::getIcon() const
 	return QIcon::fromTheme("usb-fill");
 }
 
+// Hide arcade USB devices (light gun/wheel/drums) from the USB tab
+static bool isHiddenUsbDeviceType(const std::string_view type)
+{
+	return type == "guncon2" || type == "Pad" || type == "RBDrumKit";
+}
+
 void USBDeviceWidget::populateDeviceTypes()
 {
 	for (const auto& [name, display_name] : USB::GetDeviceTypes())
+	{
+		if (isHiddenUsbDeviceType(name))
+			continue;
 		m_ui.deviceType->addItem(qApp->translate("USB", display_name), QString::fromUtf8(name));
+	}
 }
 
 void USBDeviceWidget::populatePages()
@@ -1082,6 +1092,15 @@ void USBDeviceWidget::populatePages()
 		m_ui.stackedWidget->removeWidget(m_settings_widget);
 		delete m_settings_widget;
 		m_settings_widget = nullptr;
+	}
+
+	if (isHiddenUsbDeviceType(m_device_type))
+	{
+		m_ui.deviceSubtype->setVisible(false);
+		m_ui.bindings->setEnabled(false);
+		m_ui.settings->setEnabled(false);
+		updateHeaderToolButtons();
+		return;
 	}
 
 	const std::span<const InputBindingInfo> bindings(USB::GetDeviceBindings(m_device_type, m_device_subtype));

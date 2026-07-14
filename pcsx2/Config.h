@@ -241,6 +241,15 @@ enum class FMVAspectRatioSwitchType : u8
 	MaxCount
 };
 
+enum class GSBezelFitMode : u8
+{
+	Fit,
+	Fill,
+	Stretch,
+	Center,
+	MaxCount
+};
+
 enum class MemoryCardType
 {
 	Empty,
@@ -701,6 +710,7 @@ struct Pcsx2Config
 	{
 		static const char* AspectRatioNames[];
 		static const char* FMVAspectRatioSwitchNames[];
+		static const char* BezelFitModeNames[];
 		static const char* BlendingLevelNames[];
 		static const char* CaptureContainers[];
 
@@ -852,6 +862,14 @@ struct Pcsx2Config
 
 		float StretchY = 100.0f;
 		int Crop[4] = {};
+
+		bool BezelEnabled = false;
+		std::string BezelPath;
+		float BezelOpacity = 1.0f;
+		float BezelScale = 100.0f;
+		GSBezelFitMode BezelFitMode = GSBezelFitMode::Fit;
+		bool BezelShowInFullscreen = true;
+		bool BezelShowInBigPicture = true;
 
 		float OsdScale = DEFAULT_OSD_SCALE;
 		float OsdMargin = DEFAULT_OSD_MARGIN;
@@ -1339,6 +1357,17 @@ struct Pcsx2Config
 	};
 
 	// ------------------------------------------------------------------------
+	struct ArcadeOptions {
+		bool SRAMVerboseReads{false};
+		bool RAMVerboseReads{false};
+		bool ATAVerboseReads{false};
+		bool UARTVerbose{false};
+		
+		void LoadSave(SettingsWrapper& wrap);
+
+		bool operator==(const ArcadeOptions& right) const;
+		bool operator!=(const ArcadeOptions& right) const;
+	};
 
 	BITFIELD32()
 	bool
@@ -1387,6 +1416,8 @@ struct Pcsx2Config
 	FilenameOptions BaseFilenames;
 
 	AchievementsOptions Achievements;
+
+	ArcadeOptions Arcade;
 
 	// Memorycard options - first 2 are default slots, last 6 are multitap 1 and 2
 	// slots (3 each)

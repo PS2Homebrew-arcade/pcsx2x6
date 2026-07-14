@@ -2986,7 +2986,7 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		"EmuCore/GS", "StretchY", 100, 10, 300, FSUI_CSTR("%d%%"));
 	DrawIntRectSetting(bsi, FSUI_ICONSTR(ICON_FA_CROP, "Crop"), FSUI_CSTR("Crops the image, while respecting aspect ratio."), "EmuCore/GS", "CropLeft", 0,
 		"CropTop", 0, "CropRight", 0, "CropBottom", 0, 0, 720, 1, FSUI_CSTR("%dpx"));
-
+	
 	if (!IsEditingGameSettings(bsi))
 	{
 		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_TV, "Enable Widescreen Patches"), FSUI_CSTR("Enables loading widescreen patches from pnach files."),
@@ -4929,7 +4929,12 @@ void FullscreenUI::DrawAdvancedSettingsPage()
 			"Logging", "EnableIOPConsole", true);
 		DrawToggleSetting(
 			bsi, FSUI_ICONSTR(ICON_FA_COMPACT_DISC, "CDVD Verbose Reads"), FSUI_CSTR("Logs disc reads from games."), "EmuCore", "CdvdVerboseReads", false);
+		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade ATA Verbose Reads"), FSUI_CSTR("Logs Arcade ATA reads from games."), "Arcade", "ATAVerboseReads", false);
+		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade SRAM Verbose Reads"), FSUI_CSTR("Logs Arcade SRAM reads/writes from games."), "Arcade", "SRAMVerboseReads", false);
+		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade RAM Verbose Reads"), FSUI_CSTR("Logs Arcade RAM transfers from games."), "Arcade", "RAMVerboseReads", false);
+		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade UART Verbose Reads"), FSUI_CSTR("Logs TX/RX from the arcade UART"), "Arcade", "UARTVerbose", false);
 	}
+
 
 	static constexpr const char* s_savestate_compression_type[] = {
 		FSUI_NSTR("Uncompressed"),

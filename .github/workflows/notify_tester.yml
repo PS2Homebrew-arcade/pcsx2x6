@@ -1,0 +1,43 @@
+name: Notify Testers
+
+on:
+  pull_request_target:
+    types:
+      - labeled
+
+jobs:
+  notify-testers:
+    if: github.event.label.name == 'needs-testers'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_TESTER_PINGER }}
+          ROLE_ID: '1523392780141985802'
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          payload=$(jq -n \
+            --arg role "<@&${ROLE_ID}>" \
+            --arg title "$PR_TITLE" \
+            --arg url "$PR_URL" \
+            --arg author "$PR_AUTHOR" \
+            --arg number "$PR_NUMBER" \
+            '{
+              content: ($role + " Testers needed."),
+              embeds: [
+                {
+                  title: ("PR #" + $number + ": " + $title),
+                  url: $url,
+                  description: ("Created by @" + $author)
+                }
+              ]
+            }')
+
+          curl  --fail \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK"

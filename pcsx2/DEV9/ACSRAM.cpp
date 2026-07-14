@@ -85,7 +85,7 @@ void ACSRAM::Clear(u8 fillerbyte) {
 u8 ACSRAM::Read8(u32 addr) {
     u32 T = GET_SRAM_OFF(addr);
     if (T < ACSRAM_MAX_SIZE) {
-        //Console.WriteLn(Color_StrongCyan, "%-16s %04X:  %02X", __FUNCTION__, T, ACSRAM::buffer[T]);
+        ACSRAM_LOG("read8  [%04X]:%02X", T, ACSRAM::buffer[T]);
         return ACSRAM::buffer[T];
     } else OOB_REPORT(T);
     return 0;
@@ -94,7 +94,7 @@ u8 ACSRAM::Read8(u32 addr) {
 u16 ACSRAM::Read16(u32 addr) {
     u32 T = GET_SRAM_OFF(addr);
     if (T < ACSRAM_MAX_SIZE) {
-        //Console.WriteLn(Color_StrongCyan, "%-16s %04X:  %02X", __FUNCTION__, T, ACSRAM::buffer[T]);
+        ACSRAM_LOG("read16 [%04X]:%02X", T, ACSRAM::buffer[T]);
         return ACSRAM::buffer[T];
     } else OOB_REPORT(T);
     return 0;
@@ -103,7 +103,7 @@ u16 ACSRAM::Read16(u32 addr) {
 void ACSRAM::Write16(u32 addr, u16 val) {
     u32 T = GET_SRAM_OFF(addr);
     if (T < ACSRAM_MAX_SIZE) {
-        //Console.WriteLn(Color_StrongCyan, "%-16s %04X = %02X", __FUNCTION__, T, val);
+        ACSRAM_LOG("write16 [%04X]=%02X", T, val);
         ACSRAM::buffer[T] = val;
     } else OOB_REPORT(T);
 }

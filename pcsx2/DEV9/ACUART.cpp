@@ -1,9 +1,13 @@
+#include "Config.h"
 #include "ACUART.h"
 #include "ACJV.h"
 #include "ACCORE.h"
 #include "common/Console.h"
 #include <deque>
 #include <string>
+
+#define ACUART_LOG(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.WriteLn(Color_Gray, "ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
+#define ACUART_WARN(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.Warning("ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 // 16550 UART register emulation for Namco System 246 arcade I/O
 // Ref: ps2sdk iop/arcade/acuart/src/uart.c
@@ -37,6 +41,7 @@ static constexpr u8 V257_STATUS[3] = {'C', '0', '1'}; // drive-board OK status; 
 
 u16 ACUART::Read16(u32 addr) {
 	const u32 reg = addr & 0xFFF;
+	ACUART_LOG("Read16  %03X", reg);
 	switch (reg) {
 	case 0x000: // RBR or DLL
 		if (uart_lcr & 0x80)
@@ -69,6 +74,7 @@ u16 ACUART::Read16(u32 addr) {
 	case 0x00E: // SCR
 		return uart_scr;
 	default:
+		ACUART_WARN("Unhandled read: %03X", reg);
 		return 0;
 	}
 }
@@ -101,12 +107,14 @@ static void Bg3HandleReply(u8 curTx)
 	}
 	s_v257RxFifo.push_back(hi); // byte0 = busy/ready status
 	s_v257RxFifo.push_back(0);  // byte1
+	ACUART_LOG("INTR");
 	ACCORE::intr(ACCORE::INTRN_UART);
 	s_bg3PrevTx = curTx;
 }
 
 void ACUART::Write16(u32 addr, u16 val) {
 	const u32 reg = addr & 0xFFF;
+	ACUART_LOG("Write16 %03X:%04X", reg, val);
 	switch (reg) {
 	case 0x000: // THR or DLL
 		if (uart_lcr & 0x80)
@@ -137,6 +145,7 @@ void ACUART::Write16(u32 addr, u16 val) {
 		uart_scr = val;
 		break;
 	default:
+		ACUART_WARN("Unhandled write:%03X:%04X", reg, val);
 		break;
 	}
 }
@@ -171,5 +180,6 @@ void ACUART::StreamV257(u32 cycles)
 	// Keep raising the RX IRQ every tick; reload the status only once the ISR has drained the previous copy.
 	if (s_v257RxFifo.empty())
 		s_v257RxFifo.assign(V257_STATUS, V257_STATUS + 3);
+	ACUART_LOG("INTR");
 	ACCORE::intr(ACCORE::INTRN_UART); // raise the UART RX interrupt
 }

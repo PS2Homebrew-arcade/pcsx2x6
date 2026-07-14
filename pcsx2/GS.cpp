@@ -74,7 +74,7 @@ static __fi void gsCSRwrite( const tGS_CSR& csr )
 	if (csr.FINISH)	{
 		CSRreg.FINISH = false;
 		gifUnit.gsFINISH.gsFINISHFired = false; //Clear the previously fired FINISH (YS, Indiecar 2005, MGS3)
-		gifUnit.gsFINISH.gsFINISHPending = false;
+		// Don't clear gsFINISHPending: clearing the status bit must not cancel a queued FINISH (GS->EE readback).
 	}
 	if(csr.HSINT)	CSRreg.HSINT	= false;
 	if(csr.VSINT)	CSRreg.VSINT	= false;
