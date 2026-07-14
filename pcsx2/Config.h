@@ -1357,6 +1357,17 @@ struct Pcsx2Config
 	};
 
 	// ------------------------------------------------------------------------
+	struct ArcadeOptions {
+		bool SRAMVerboseReads{false};
+		bool RAMVerboseReads{false};
+		bool ATAVerboseReads{false};
+		bool UARTVerbose{false};
+		
+		void LoadSave(SettingsWrapper& wrap);
+
+		bool operator==(const ArcadeOptions& right) const;
+		bool operator!=(const ArcadeOptions& right) const;
+	};
 
 	BITFIELD32()
 	bool
@@ -1405,6 +1416,8 @@ struct Pcsx2Config
 	FilenameOptions BaseFilenames;
 
 	AchievementsOptions Achievements;
+
+	ArcadeOptions Arcade;
 
 	// Memorycard options - first 2 are default slots, last 6 are multitap 1 and 2
 	// slots (3 each)

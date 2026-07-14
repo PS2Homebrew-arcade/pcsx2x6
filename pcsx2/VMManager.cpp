@@ -192,6 +192,7 @@ static bool s_elf_executed = false;
 static std::string s_elf_override;
 static std::string s_acgame;
 static std::string s_acgame_serial;
+std::string ArcadeiLinkID;
 static std::string s_input_profile_name;
 static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
@@ -530,6 +531,7 @@ void VMManager::UpdateLoggingSettings(SettingsInterface& si)
 	TraceLogging.IOP.Memory.Enabled = true;
 	TraceLogging.SIF.Enabled = true;
 
+
 	// Input Recording Logs
 	ConsoleLogging.recordingConsole.Enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	ConsoleLogging.controlInfo.Enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableControllerLogs", false);
@@ -555,6 +557,11 @@ void VMManager::SetDefaultLoggingSettings(SettingsInterface& si)
 	si.SetBoolValue("Logging", "EnableIOPConsole", false);
 	si.SetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	si.SetBoolValue("Logging", "EnableControllerLogs", false);
+	
+	si.SetBoolValue("Arcade", "ATAVerboseReads", false);
+	si.SetBoolValue("Arcade", "SRAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "RAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "UARTVerbose", false);
 
 	EmuConfig.Trace.Enabled = false;
 	EmuConfig.Trace.EE.bitset = 0;
@@ -1010,11 +1017,11 @@ std::string VMManager::GetSerialForGameSettings()
 bool VMManager::UpdateGameSettingsLayer()
 {
 	std::unique_ptr<INISettingsInterface> new_interface;
-	if (s_disc_crc != 0)
+	if (s_disc_crc != 0 || !s_acgame.empty()) // arcade: crc 0, keyed by the .acgame gameid
 	{
 		const std::string game_serial = GetSerialForGameSettings();
 		std::string filename(GetGameSettingsPath(game_serial, s_disc_crc));
-		if (!FileSystem::FileExists(filename.c_str()))
+		if (!FileSystem::FileExists(filename.c_str()) && s_acgame.empty()) // arcade: only {gameid}_0, no shared crc-only fallback
 		{
 			if (!game_serial.empty())
 				filename = GetGameSettingsPath(game_serial, 0);
@@ -1132,6 +1139,10 @@ void VMManager::UpdateDiscDetails(bool booting)
 		// If we're booting an ELF, use its CRC, not the disc (if any).
 		if (!s_elf_override.empty())
 			s_disc_crc = cdvdGetElfCRC(s_elf_override);
+
+		// Arcade identity is crc 0 for every media (CD/DVD/HDD); the .acgame gameid is the serial.
+		if (!s_acgame.empty())
+			s_disc_crc = 0;
 
 		if (!booting && s_disc_serial == old_serial && s_disc_crc == old_crc)
 		{
@@ -1262,7 +1273,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	}
 
 	elfo.LoadHeaders();
-	s_current_crc = elfo.GetCRC();
+	s_current_crc = s_acgame.empty() ? elfo.GetCRC() : 0; // arcade: identity is the .acgame (crc 0), proverb.elf or boot.elf alike
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
@@ -1344,6 +1355,12 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string s_acmedia, s_imgname, s_serial;
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc");
+				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
+				if (!ArcadeiLinkID.empty() &&
+					(ArcadeiLinkID == "ASIA4" || ArcadeiLinkID == "ASIA5" || ArcadeiLinkID == "JAPAN")) {
+					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
+					return false;
+				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
 				s_title = s_serial = INI.GetStringValue("game", "name");
 				s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
 				s_acgame_serial = s_serial;
@@ -1868,6 +1885,7 @@ void VMManager::Shutdown(bool save_resume_state)
 	s_elf_override = {};
 	s_acgame = {};
 	s_acgame_serial = {};
+	ArcadeiLinkID = {};
 	PS2CLK = PS2CLK_DEFAULT;
 	PSXCLK = 36864000;
 	s_sys256_mode = false;

@@ -261,7 +261,7 @@ void ACJV::LoadConfig(const SettingsInterface& si)
 			state |= s_dip_switch_masks[i];
 	}
 	s_dip_switch_state = state;
-	s_suppress_daemon = si.GetBoolValue(CONFIG_SECTION, "SuppressDaemon", true);
+	s_suppress_daemon = si.GetBoolValue("Arcade", "SuppressDaemon", true);
 	s_sinden_border_enabled = si.GetBoolValue(CONFIG_SECTION, "SindenBorderEnabled", false);
 	s_sinden_border_mode = si.GetIntValue(CONFIG_SECTION, "SindenBorderMode", 0);
 	s_sinden_border_thickness = si.GetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);
@@ -273,7 +273,7 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 	{
 		for (const DIPSwitchInfo& dip_switch : s_dip_switch_info)
 			dest_si->CopyBoolValue(src_si, CONFIG_SECTION, dip_switch.name);
-		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "SuppressDaemon");
+		dest_si->CopyBoolValue(src_si, "Arcade", "SuppressDaemon");
 		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "SindenBorderEnabled");
 		dest_si->CopyIntValue(src_si, CONFIG_SECTION, "SindenBorderMode");
 		dest_si->CopyIntValue(src_si, CONFIG_SECTION, "SindenBorderThickness");
@@ -338,7 +338,7 @@ void ACJV::SetDefaultConfiguration(SettingsInterface& si)
 	si.ClearSection(CONFIG_SECTION);
 	for (const DIPSwitchInfo& dip_switch : s_dip_switch_info)
 		si.SetBoolValue(CONFIG_SECTION, dip_switch.name, dip_switch.default_value);
-	si.SetBoolValue(CONFIG_SECTION, "SuppressDaemon", true);
+	si.SetBoolValue("Arcade", "SuppressDaemon", true);
 	si.SetBoolValue(CONFIG_SECTION, "SindenBorderEnabled", false);
 	si.SetIntValue(CONFIG_SECTION, "SindenBorderMode", 0);
 	si.SetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);

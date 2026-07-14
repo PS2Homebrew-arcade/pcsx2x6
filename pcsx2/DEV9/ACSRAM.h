@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MemoryTypes.h"
+#include "Config.h"
 #include "common/Pcsx2Types.h"
 #include "common/Pcsx2Defs.h"
 #include <string>
@@ -8,6 +9,8 @@
 #define ACSRAM_ADDR_BASE 0x12500000
 #define ACSRAM_RANGE     0x1250
 #define ACSRAM_MAX_SIZE  _32kb // size of the SRAM
+
+#define ACSRAM_LOG(fmt, ...) if (EmuConfig.Arcade.SRAMVerboseReads) Console.WriteLn(Color_Gray, "SRAM:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 namespace ACSRAM
 {

@@ -3,8 +3,10 @@
 #include "ACRAM.h"
 #include "MemoryTypes.h"
 #include "IopMem.h"
-
 #include <cstring>
+
+#include "Config.h"
+#define ACRAM_LOG(fmt, ...) if (EmuConfig.Arcade.RAMVerboseReads) Console.WriteLn(Color_Gray, "ACRAM:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 #define OOB_REPORT(T) Console.Error("%s: out of bound index: %08X", __FUNCTION__, T)
 #define GET_RAM_OFF(addr) (((addr) - ACRAM_ADDR_BASE) / 2) // u8 buffer on u16 MMIO, halve the address to get real offset
@@ -62,6 +64,7 @@ int ACRAM::BankFromDmaTarget(u32 dma_target) { // same bank select as Write16
 void ACRAM::DmaRead(u32* iop_buf, u32 size_bytes, int bank) {
     u32& addr = banks[bank].read_addr;
     addr &= (ACRAM_MAX_SIZE - 1);
+    ACRAM_LOG("DMARead  addr:%8X size:%8X bank:%d", addr, size_bytes, bank);
     if (addr + size_bytes <= ACRAM_MAX_SIZE) {
         std::memcpy(iop_buf, &iopMem->ACRAM[addr], size_bytes);
     } else {
@@ -75,6 +78,7 @@ void ACRAM::DmaRead(u32* iop_buf, u32 size_bytes, int bank) {
 void ACRAM::DmaWrite(u32* iop_buf, u32 size_bytes, int bank) {
     u32& addr = banks[bank].write_addr;
     addr &= (ACRAM_MAX_SIZE - 1);
+    ACRAM_LOG("DMAWrite addr:%8X size:%8X bank:%d", addr, size_bytes, bank);
     if (addr + size_bytes <= ACRAM_MAX_SIZE) {
         std::memcpy(&iopMem->ACRAM[addr], iop_buf, size_bytes);
     } else {
