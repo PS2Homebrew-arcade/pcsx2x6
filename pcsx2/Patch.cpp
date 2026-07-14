@@ -325,7 +325,9 @@ std::string Patch::GetPnachTemplate(const std::string_view serial, u32 crc, bool
 		if (all_crcs)
 			return fmt::format("{}_*.pnach", serial);
 		else if (include_serial)
-			return fmt::format("{}_{:08X}{}.pnach", serial, crc, add_wildcard ? "*" : "");
+			return crc == 0 // arcade: the gameid is the identity, crc is always 0 -> drop the suffix
+				? fmt::format("{}{}.pnach", serial, add_wildcard ? "*" : "")
+				: fmt::format("{}_{:08X}{}.pnach", serial, crc, add_wildcard ? "*" : "");
 	}
 	return fmt::format("{:08X}{}.pnach", crc, add_wildcard ? "*" : "");
 }
@@ -608,6 +610,18 @@ void Patch::ReloadEnabledLists()
 				[](const std::string& it) { return (it == NI_PATCH_NAME); }))
 		{
 			s_enabled_patches.emplace_back(NI_PATCH_NAME);
+		}
+	}
+
+	// arcade: labeled game patches are on by default (uncheck disables via the disabled list below)
+	for (const PatchGroup& group : s_game_patches)
+	{
+		if (group.name.empty() || group.name == WS_PATCH_NAME || group.name == NI_PATCH_NAME)
+			continue;
+		if (std::none_of(s_enabled_patches.begin(), s_enabled_patches.end(),
+				[&group](const std::string& it) { return (it == group.name); }))
+		{
+			s_enabled_patches.emplace_back(group.name);
 		}
 	}
 
@@ -1182,6 +1196,11 @@ u32 Patch::GetAllActivePatchesCount()
 }
 
 bool Patch::IsGloballyToggleablePatch(const PatchInfo& patch_info)
+{
+	return !patch_info.name.empty(); // arcade: every labeled patch is individually toggleable
+}
+
+bool Patch::IsGlobalSettingPatch(const PatchInfo& patch_info)
 {
 	return patch_info.name == WS_PATCH_NAME || patch_info.name == NI_PATCH_NAME;
 }

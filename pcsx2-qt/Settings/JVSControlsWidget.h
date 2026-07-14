@@ -7,7 +7,14 @@
 
 #include <QtWidgets/QWidget>
 
+#include <span>
+#include <string>
+
 class ControllerSettingsWindow;
+class QShowEvent;
+class QComboBox;
+class QVBoxLayout;
+struct InputBindingInfo;
 
 class JVSControlsWidget final : public QWidget
 {
@@ -17,10 +24,26 @@ public:
 	JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* dialog);
 	~JVSControlsWidget() override;
 
+protected:
+	void showEvent(QShowEvent* event) override;
+
 private:
+	void refreshBoardType();
+	void autoPickInputPage();
 	void bindDIPSwitchWidgets();
 	void bindSystemButtonWidgets();
+	void buildDrumPage();
+	void buildFightingPage();
+	void buildRacingPage();
+	void buildTwinstickPage();
+	void buildLightgunPage();
+	void buildStandardPage();
+	void refreshAimDevices();
+	void refreshMacrosPage(); // rebuild the Macros view (layout dropdown + per-layout rows)
+	void buildMacroRows(QVBoxLayout* rowsLayout, const std::string& layoutKey, std::span<const InputBindingInfo> lbuttons);
 
 	Ui::JVSControlsWidget m_ui;
 	ControllerSettingsWindow* m_dialog;
+	std::string m_autoPickedGameId;
+	QComboBox* m_aimCombos[2] = {}; // [0] = USB1/P1, [1] = USB2/P2
 };

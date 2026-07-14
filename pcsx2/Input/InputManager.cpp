@@ -882,72 +882,65 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
 
-	// P1 and P2 button bindings + auto-mirror from Pad1/Pad2
 	const std::span<const InputBindingInfo> player_bindings[] = {
 		ACJV::GetButtonBindings(),
 		ACJV::GetP2ButtonBindings(),
+	};
+
+	// Skip the generic P*_Button2..6 (games bind per-layout keys); keep P*_Button1 = the System ENTER switch.
+	const auto is_stale_generic_button = [](const char* name) {
+		const std::string_view n(name);
+		return (n.starts_with("P1_Button") || n.starts_with("P2_Button")) && !n.ends_with("1");
 	};
 
 	for (u32 player = 0; player < 2; player++)
 	{
 		for (const InputBindingInfo& bi : player_bindings[player])
 		{
+			if (is_stale_generic_button(bi.name))
+				continue;
 			const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, bi.name));
 			if (bindings.empty())
 				continue;
 
-			AddBindings(bindings, InputAxisEventHandler{[player, mask = static_cast<u16>(bi.bind_index)](InputBindingKey key, float value) {
-				ACJV::SetButtonState(player, mask, value > 0.5f);
+			u16 mask = static_cast<u16>(bi.bind_index);
+			u32 target_player = player;
+			// Lightgun: send the System Start to the game's start bit (both guns on a 2-player cabinet).
+			if (ACJV::GetMode() == JVS_MODE::LIGHTGUN && mask == JVS_BTN_START)
+			{
+				const u16 gun_start = (player == 0) ? ACJV::GetGunMapping().p1_start : ACJV::GetGunMapping().p2_start;
+				if (gun_start)
+				{
+					mask = gun_start;
+					target_player = 0;
+				}
+			}
+			AddBindings(bindings, InputAxisEventHandler{[target_player, mask](InputBindingKey key, float value) {
+				ACJV::SetButtonState(target_player, mask, value > 0.5f);
 			}}, bi.bind_type, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 		}
-
-		// Mirror PadN gamepad bindings to JVS player N via matching GenericInputBinding.
-		// Real S246 cabinets have no DS2 — the arcade panel wires directly to JVS.
-		// We read the user's Pad bindings and route them to JVS as the sole input path.
-		const Pad::ControllerInfo* pad_ci = Pad::GetControllerInfo(EmuConfig.Pad.Ports[player].Type);
-		if (!pad_ci)
-			continue;
-
-		const std::string pad_section = Pad::GetConfigSection(player);
-		for (const InputBindingInfo& jvs_bi : player_bindings[player])
-		{
-			if (jvs_bi.generic_mapping == GenericInputBinding::Unknown ||
-				jvs_bi.generic_mapping == GenericInputBinding::Select)
-				continue;
-
-			for (const InputBindingInfo& pad_bi : pad_ci->bindings)
-			{
-				if (pad_bi.generic_mapping != jvs_bi.generic_mapping)
-					continue;
-
-				const std::vector<std::string> pad_bindings(si.GetStringList(pad_section.c_str(), pad_bi.name));
-				for (const std::string& pb : pad_bindings)
-				{
-					AddBinding(pb, InputAxisEventHandler{[player, mask = static_cast<u16>(jvs_bi.bind_index)](InputBindingKey key, float value) {
-						ACJV::SetButtonState(player, mask, value > 0.5f);
-					}});
-				}
-				break;
-			}
-		}
-
-		// Mirror PadN Select -> Coin insert for player N
-		for (const InputBindingInfo& pad_bi : pad_ci->bindings)
-		{
-			if (pad_bi.generic_mapping != GenericInputBinding::Select)
-				continue;
-
-			const std::vector<std::string> pad_bindings(si.GetStringList(pad_section.c_str(), pad_bi.name));
-			for (const std::string& pb : pad_bindings)
-			{
-				AddBinding(pb, InputButtonEventHandler{[player](s32 pressed) {
-					if (pressed > 0)
-						ACJV::InsertCoin(player);
-				}});
-			}
-			break;
-		}
 	}
+
+	// Per-layout action buttons (hub): bind {base}_P1/_P2 to the JVS bit. Fighting and standard wire both
+	// players (the generic P1_Button* are skipped above); racing is 1 player per cabinet, so P1 only.
+	const auto bind_layout_buttons = [&](std::span<const InputBindingInfo> buttons, bool two_players) {
+		for (const InputBindingInfo& bi : buttons)
+		{
+			for (u32 player = 0; player < (two_players ? 2u : 1u); player++)
+			{
+				const std::string cfgkey = std::string(bi.name) + (player == 0 ? "_P1" : "_P2");
+				const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, cfgkey.c_str()));
+				if (bindings.empty())
+					continue;
+				AddBindings(bindings, InputAxisEventHandler{[player, mask = static_cast<u16>(bi.bind_index)](InputBindingKey, float value) {
+					ACJV::SetButtonState(player, mask, value > 0.5f);
+				}}, bi.bind_type, si, ACJV::CONFIG_SECTION, cfgkey.c_str(), is_profile);
+			}
+		}
+	};
+	bind_layout_buttons(ACJV::GetFightingButtons(), true);
+	bind_layout_buttons(ACJV::GetStandardButtons(), true);
+	bind_layout_buttons(ACJV::GetRacingButtons(), false);
 
 	for (const InputBindingInfo& bi : ACJV::GetCoinBindings())
 	{
@@ -961,43 +954,62 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
 
-	// driving analog axes (steer/gas/brake) -> JVS wheel channels, mirroring the button bindings above
+	// JVS macros: push the running layout's macro switch masks to ACJV and register each trigger.
+	const std::string macro_layout = ACJV::GetCurrentLayoutKey();
+	if (!macro_layout.empty())
+	{
+		for (u32 p = 0; p < 2; p++) // JVS P1/P2
+		{
+			for (u32 i = 0; i < ACJV::NUM_JVS_MACROS; i++)
+			{
+				u16 mask = 0;
+				for (const std::string& n : si.GetStringList(ACJV::CONFIG_SECTION, ACJV::MacroConfigKey(macro_layout, p, i, "Binds").c_str()))
+					for (const ACJV::JvsMacroSwitch& sw : ACJV::GetMacroSwitches())
+						if (n == sw.name) { mask |= sw.bit; break; }
+				ACJV::SetMacroMask(p, i, mask);
+
+				const std::string key = ACJV::MacroConfigKey(macro_layout, p, i, "");
+				const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, key.c_str()));
+				if (bindings.empty())
+					continue;
+
+				AddBindings(bindings, InputButtonEventHandler{[p, i](s32 pressed) {
+					ACJV::SetMacroState(p, i, pressed > 0);
+				}}, InputBindingInfo::Type::Macro, si, ACJV::CONFIG_SECTION, key.c_str(), is_profile);
+			}
+		}
+	}
+
+	// Racing analog axes -> JVS wheel channels, with deadzone/sensitivity applied.
+	const float analog_deadzone = si.GetFloatValue(ACJV::CONFIG_SECTION, "AnalogDeadzone", 0.0f);
+	const float analog_sensitivity = si.GetFloatValue(ACJV::CONFIG_SECTION, "AnalogSensitivity", 1.33f);
+	const float trigger_deadzone = si.GetFloatValue(ACJV::CONFIG_SECTION, "TriggerDeadzone", 0.0f);
+	const bool invert_steering = si.GetBoolValue(ACJV::CONFIG_SECTION, "InvertSteering", false);
 	for (const InputBindingInfo& bi : ACJV::GetWheelBindings())
 	{
 		const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, bi.name));
 		if (bindings.empty())
 			continue;
 
-		AddBindings(bindings, InputAxisEventHandler{[axis = static_cast<u32>(bi.bind_index)](InputBindingKey key, float value) {
-			ACJV::SetWheelAxis(axis, value);
+		const bool is_steering = (bi.bind_index <= 1);
+		const float deadzone = is_steering ? analog_deadzone : trigger_deadzone;
+		const float sensitivity = is_steering ? analog_sensitivity : 1.0f;
+		const bool invert = is_steering && invert_steering;
+		AddBindings(bindings, InputAxisEventHandler{[axis = static_cast<u32>(bi.bind_index), sensitivity, deadzone, invert](InputBindingKey key, float value) {
+			ACJV::SetWheelAxis(axis, ApplySingleBindingScale(sensitivity, deadzone, invert ? -value : value));
 		}}, bi.bind_type, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
 
-	if (const Pad::ControllerInfo* pad_ci = Pad::GetControllerInfo(EmuConfig.Pad.Ports[0].Type))
+	// Taiko drum sensors (button press -> above-threshold hit on a JVS analog channel)
+	for (const InputBindingInfo& bi : ACJV::GetDrumBindings())
 	{
-		const std::string pad_section = Pad::GetConfigSection(0);
-		// apply Port 1's deadzone to the auto-mirrored wheel (the JVS path skips the pad's own, so a worn stick drifts)
-		const float stick_deadzone = si.GetFloatValue(pad_section.c_str(), "Deadzone", Pad::DEFAULT_STICK_DEADZONE);
-		const float trig_deadzone = si.GetFloatValue(pad_section.c_str(), "ButtonDeadzone", Pad::DEFAULT_BUTTON_DEADZONE);
-		for (const InputBindingInfo& jvs_bi : ACJV::GetWheelBindings())
-		{
-			for (const InputBindingInfo& pad_bi : pad_ci->bindings)
-			{
-				if (pad_bi.generic_mapping != jvs_bi.generic_mapping)
-					continue;
+		const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, bi.name));
+		if (bindings.empty())
+			continue;
 
-				// steering (axes 0/1) uses the analog deadzone; gas/brake (2/3) the trigger deadzone
-				const float deadzone = (jvs_bi.bind_index <= 1) ? stick_deadzone : trig_deadzone;
-				const std::vector<std::string> pad_bindings(si.GetStringList(pad_section.c_str(), pad_bi.name));
-				for (const std::string& pb : pad_bindings)
-				{
-					AddBinding(pb, InputAxisEventHandler{[axis = static_cast<u32>(jvs_bi.bind_index), deadzone](InputBindingKey key, float value) {
-						ACJV::SetWheelAxis(axis, ApplySingleBindingScale(1.0f, deadzone, value));
-					}});
-				}
-				break;
-			}
-		}
+		AddBindings(bindings, InputAxisEventHandler{[channel = static_cast<u32>(bi.bind_index)](InputBindingKey key, float value) {
+			ACJV::SetDrumHit(channel, value > 0.5f);
+		}}, bi.bind_type, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
 }
 

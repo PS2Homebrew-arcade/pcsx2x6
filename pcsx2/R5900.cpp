@@ -275,6 +275,7 @@ static __fi bool _cpuTestInterrupts()
 		TESTINT(VU_MTVU_BUSY, MTVUInterrupt);
 		TESTINT(DMAC_VIF1, vif1Interrupt);
 		TESTINT(DMAC_GIF, gifInterrupt);
+		TESTINT(DMAC_GIF_UNIT, Gif_FinishIRQEvent);
 		TESTINT(DMAC_SIF0, EEsif0Interrupt);
 		TESTINT(DMAC_SIF1, EEsif1Interrupt);
 		// Profile-guided Optimization (sorta)

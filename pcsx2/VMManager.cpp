@@ -19,6 +19,7 @@
 #include "Host.h"
 #include "INISettingsInterface.h"
 #include "ImGui/FullscreenUI.h"
+#include "ImGui/ImGuiManager.h"
 #include "ImGui/ImGuiOverlays.h"
 #include "Input/InputManager.h"
 #include "IopBios.h"
@@ -102,6 +103,8 @@ namespace VMManager
 	static void CheckForConfigChanges(const Pcsx2Config& old_config);
 	static void CheckForCPUConfigChanges(const Pcsx2Config& old_config);
 	static void CheckForGSConfigChanges(const Pcsx2Config& old_config);
+	static ImGuiManager::BezelFitMode ConvertBezelFitMode(GSBezelFitMode mode);
+	static void UpdateBezelOverlay();
 	static void CheckForEmulationSpeedConfigChanges(const Pcsx2Config& old_config);
 	static void CheckForPatchConfigChanges(const Pcsx2Config& old_config);
 	static void CheckForDEV9ConfigChanges(const Pcsx2Config& old_config);
@@ -173,6 +176,7 @@ static std::deque<std::thread> s_save_state_threads;
 static std::mutex s_save_state_threads_mutex;
 
 static std::recursive_mutex s_info_mutex;
+static std::string s_arcade_gameid;
 static std::string s_disc_serial;
 static std::string s_disc_elf;
 static std::string s_disc_version;
@@ -187,6 +191,8 @@ static std::pair<u32, u32> s_elf_text_range;
 static bool s_elf_executed = false;
 static std::string s_elf_override;
 static std::string s_acgame;
+static std::string s_acgame_serial;
+std::string ArcadeiLinkID;
 static std::string s_input_profile_name;
 static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
@@ -525,6 +531,7 @@ void VMManager::UpdateLoggingSettings(SettingsInterface& si)
 	TraceLogging.IOP.Memory.Enabled = true;
 	TraceLogging.SIF.Enabled = true;
 
+
 	// Input Recording Logs
 	ConsoleLogging.recordingConsole.Enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	ConsoleLogging.controlInfo.Enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableControllerLogs", false);
@@ -550,6 +557,11 @@ void VMManager::SetDefaultLoggingSettings(SettingsInterface& si)
 	si.SetBoolValue("Logging", "EnableIOPConsole", false);
 	si.SetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	si.SetBoolValue("Logging", "EnableControllerLogs", false);
+	
+	si.SetBoolValue("Arcade", "ATAVerboseReads", false);
+	si.SetBoolValue("Arcade", "SRAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "RAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "UARTVerbose", false);
 
 	EmuConfig.Trace.Enabled = false;
 	EmuConfig.Trace.EE.bitset = 0;
@@ -676,6 +688,8 @@ void VMManager::LoadCoreSettings(SettingsInterface& si)
 	EmuConfig.GS.MaskUserHacks();
 	EmuConfig.GS.MaskUpscalingHacks();
 
+	UpdateBezelOverlay();
+
 	// Force MTVU off when playing back GS dumps, it doesn't get used.
 	if (GSDumpReplayer::IsReplayingDump())
 		EmuConfig.Speedhacks.vuThread = false;
@@ -726,6 +740,10 @@ bool VMManager::HasAnyBindingsForPad(const SettingsInterface& si, u32 port)
 
 void VMManager::WarnAboutUnconfiguredController()
 {
+	// Arcade input is over JVS, so skip the "no controller bindings configured" warning for arcade games.
+	if (!s_acgame.empty())
+		return;
+
 	std::unique_lock<std::mutex> lock = Host::GetSettingsLock();
 	SettingsInterface* si = Host::GetSettingsInterface();
 	if (!si || HasAnyBindingsForPad(*si, 0))
@@ -985,22 +1003,34 @@ void VMManager::RequestDisplaySize(float scale /*= 0.0f*/)
 
 std::string VMManager::GetSerialForGameSettings()
 {
-	// If we're running an ELF, we don't want to use the serial for any ISO override
-	// for game settings, since the game settings is where we define the override.
+	// If this is an .acgame launch, use the arcade GameID from the .acgame file.
+	// Arcade CHDs often report a blank disc serial, but the .acgame gameid is valid.
 	std::unique_lock lock(s_info_mutex);
+	if (!s_acgame_serial.empty())
+		return s_acgame_serial;
+
+	// If we're running a normal loose ELF, don't use the serial for game settings,
+	// since the game settings layer is where ELF disc overrides are defined.
 	return s_elf_override.empty() ? std::string(s_disc_serial) : std::string();
 }
 
 bool VMManager::UpdateGameSettingsLayer()
 {
 	std::unique_ptr<INISettingsInterface> new_interface;
-	if (s_disc_crc != 0)
+	if (s_disc_crc != 0 || !s_acgame.empty()) // arcade: crc 0, keyed by the .acgame gameid
 	{
-		std::string filename(GetGameSettingsPath(GetSerialForGameSettings(), s_disc_crc));
-		if (!FileSystem::FileExists(filename.c_str()))
+		const std::string game_serial = GetSerialForGameSettings();
+		std::string filename(GetGameSettingsPath(game_serial, s_disc_crc));
+		if (!FileSystem::FileExists(filename.c_str()) && s_acgame.empty()) // arcade: only {gameid}_0, no shared crc-only fallback
 		{
-			// try the legacy format (crc.ini)
-			filename = GetGameSettingsPath({}, s_disc_crc);
+			if (!game_serial.empty())
+				filename = GetGameSettingsPath(game_serial, 0);
+
+			if (!FileSystem::FileExists(filename.c_str()))
+			{
+				// try the legacy format (crc.ini)
+				filename = GetGameSettingsPath({}, s_disc_crc);
+			}
 		}
 
 		if (FileSystem::FileExists(filename.c_str()))
@@ -1080,10 +1110,14 @@ void VMManager::UpdateDiscDetails(bool booting)
 		else if (CDVDsys_GetSourceType() != CDVD_SourceType::NoDisc)
 		{
 			cdvdGetDiscInfo(&s_disc_serial, &s_disc_elf, &s_disc_version, &s_disc_crc, nullptr);
+
+			if (!s_acgame_serial.empty() && s_disc_serial.empty())
+				s_disc_serial = s_acgame_serial;
+
 			serial_is_valid = !s_disc_serial.empty();
 		}
 		else if (!s_acgame.empty()) {
-			//s_disc_serial = Path::GetFileTitle(s_acgame);
+			s_disc_serial = s_arcade_gameid;
 			title = s_title;
 			s_disc_version = {};
 			s_disc_crc = 0;
@@ -1105,6 +1139,10 @@ void VMManager::UpdateDiscDetails(bool booting)
 		// If we're booting an ELF, use its CRC, not the disc (if any).
 		if (!s_elf_override.empty())
 			s_disc_crc = cdvdGetElfCRC(s_elf_override);
+
+		// Arcade identity is crc 0 for every media (CD/DVD/HDD); the .acgame gameid is the serial.
+		if (!s_acgame.empty())
+			s_disc_crc = 0;
 
 		if (!booting && s_disc_serial == old_serial && s_disc_crc == old_crc)
 		{
@@ -1235,7 +1273,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	}
 
 	elfo.LoadHeaders();
-	s_current_crc = elfo.GetCRC();
+	s_current_crc = s_acgame.empty() ? elfo.GetCRC() : 0; // arcade: identity is the .acgame (crc 0), proverb.elf or boot.elf alike
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
@@ -1317,8 +1355,15 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string s_acmedia, s_imgname, s_serial;
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc");
+				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
+				if (!ArcadeiLinkID.empty() &&
+					(ArcadeiLinkID == "ASIA4" || ArcadeiLinkID == "ASIA5" || ArcadeiLinkID == "JAPAN")) {
+					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
+					return false;
+				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
 				s_title = s_serial = INI.GetStringValue("game", "name");
-				s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
+				s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
+				s_acgame_serial = s_serial;
 				bool idvalid = (s_serial.length() == 7 && (s_serial[0] == 'N' && s_serial[1] == 'M'));
     			for (int i = 2; idvalid && i < 7; i++)
     			    idvalid = (s_serial[i] >= '0' && s_serial[i] <= '9');
@@ -1378,31 +1423,28 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf"));
 				EmuConfig.CurrentGameArgs = INI.GetStringValue("data", "args");
 				ACSRAM::filepath = Path::Combine(basedir, INI.GetStringValue("data", "sram", "sram.bin"));
+				// JVS device mode: an explicit jvsmode= in the .acgame overrides (force/legacy); otherwise it is
+				// derived from the gameid alone (ACJV::ResolveModeFromGameId), so a .acgame needs only its gameid.
 				std::string jvsmode = INI.GetStringValue("data", "jvsmode", "");
-				if (jvsmode == "lightgun")
-				{
-					Host::SetBaseStringSettingValue("USB1", "Type", "guncon2");
-					Host::SetBaseStringSettingValue("USB2", "Type", "guncon2");
-					ACJV::SetMode(JVS_MODE::LIGHTGUN);
-					Console.WriteLn(Color_Green, "ACGAME: jvsmode=lightgun -> GunCon2 on USB1+USB2");
-				}
-				else
-				{
-					Host::SetBaseStringSettingValue("USB1", "Type", "None");
-					Host::SetBaseStringSettingValue("USB2", "Type", "None");
-					if (jvsmode == "fighting")
-					{
-						ACJV::SetMode(JVS_MODE::FIGHTING);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=fighting");
-					}
-					else if (jvsmode == "racing")
-					{
-						ACJV::SetMode(JVS_MODE::DRIVE);
-						Console.WriteLn(Color_Green, "ACGAME: jvsmode=racing");
-					}
-					else
-						ACJV::SetMode(JVS_MODE::DEFAULT);
-				}
+				JVS_MODE mode;
+				if (jvsmode.empty())             mode = ACJV::ResolveModeFromGameId(s_serial);
+				else if (jvsmode == "lightgun")  mode = JVS_MODE::LIGHTGUN;
+				else if (jvsmode == "fighting")  mode = JVS_MODE::FIGHTING;
+				else if (jvsmode == "drum")      mode = JVS_MODE::DRUM;
+				else if (jvsmode == "racing")    mode = JVS_MODE::DRIVE;
+				else if (jvsmode == "standard")  mode = JVS_MODE::STANDARD;
+				else if (jvsmode == "twinstick") mode = JVS_MODE::TWINSTICK;
+				else                             mode = JVS_MODE::DEFAULT; // unknown override string
+
+				// Attach the 2nd GunCon2 only for 2-player games, so 1-player cabinets show no extra crosshair.
+				const bool lightgun = (mode == JVS_MODE::LIGHTGUN);
+				const bool two_gun = lightgun && ACJV::GetGunMapping().p2_start != 0;
+				Host::SetBaseStringSettingValue("USB1", "Type", lightgun ? "guncon2" : "None");
+				Host::SetBaseStringSettingValue("USB2", "Type", two_gun ? "guncon2" : "None");
+				ACJV::SetMode(mode);
+				Console.WriteLn(Color_Green, "ACGAME: jvsmode=%s -> JVS device mode %d%s",
+					jvsmode.empty() ? "(derived from gameid)" : jvsmode.c_str(),
+					static_cast<int>(mode), lightgun ? (two_gun ? " -> GunCon2 on USB1+USB2" : " -> GunCon2 on USB1") : "");
 
 				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
 				int R;
@@ -1842,6 +1884,8 @@ void VMManager::Shutdown(bool save_resume_state)
 	SaveSessionTime(s_disc_serial);
 	s_elf_override = {};
 	s_acgame = {};
+	s_acgame_serial = {};
+	ArcadeiLinkID = {};
 	PS2CLK = PS2CLK_DEFAULT;
 	PSXCLK = 36864000;
 	s_sys256_mode = false;
@@ -3131,6 +3175,35 @@ void VMManager::Internal::PollInputOnCPUThread()
 	}
 }
 
+ImGuiManager::BezelFitMode VMManager::ConvertBezelFitMode(GSBezelFitMode mode)
+{
+	switch (mode)
+	{
+		case GSBezelFitMode::Stretch:
+			return ImGuiManager::BezelFitMode::Stretch;
+
+		case GSBezelFitMode::Fill:
+			return ImGuiManager::BezelFitMode::Cover;
+
+		case GSBezelFitMode::Fit:
+		case GSBezelFitMode::Center:
+		default:
+			return ImGuiManager::BezelFitMode::Contain;
+	}
+}
+
+void VMManager::UpdateBezelOverlay()
+{
+	Console.WriteLn("Bezel: UpdateBezelOverlay");
+
+	ImGuiManager::SetBezelOverlay(
+		EmuConfig.GS.BezelEnabled,
+		EmuConfig.GS.BezelPath,
+		EmuConfig.GS.BezelOpacity,
+		static_cast<float>(EmuConfig.GS.BezelScale) / 100.0f,
+		ConvertBezelFitMode(EmuConfig.GS.BezelFitMode));
+}
+
 void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 {
 	if (EmuConfig.Cpu == old_config.Cpu && EmuConfig.Gamefixes == old_config.Gamefixes &&
@@ -3163,6 +3236,17 @@ void VMManager::CheckForGSConfigChanges(const Pcsx2Config& old_config)
 		return;
 
 	Console.WriteLn("Updating GS configuration...");
+
+	if (EmuConfig.GS.BezelEnabled != old_config.GS.BezelEnabled ||
+		EmuConfig.GS.BezelPath != old_config.GS.BezelPath ||
+		EmuConfig.GS.BezelOpacity != old_config.GS.BezelOpacity ||
+		EmuConfig.GS.BezelScale != old_config.GS.BezelScale ||
+		EmuConfig.GS.BezelFitMode != old_config.GS.BezelFitMode ||
+		EmuConfig.GS.BezelShowInFullscreen != old_config.GS.BezelShowInFullscreen ||
+		EmuConfig.GS.BezelShowInBigPicture != old_config.GS.BezelShowInBigPicture)
+	{
+		UpdateBezelOverlay();
+	}
 
 	// We could just check whichever NTSC or PAL is appropriate for our current mode,
 	// but people _really_ shouldn't be screwing with framerate, so whatever.

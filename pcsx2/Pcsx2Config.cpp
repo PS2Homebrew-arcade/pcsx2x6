@@ -652,6 +652,14 @@ const char* Pcsx2Config::GSOptions::FMVAspectRatioSwitchNames[(size_t)FMVAspectR
 	"10:7",
 	nullptr};
 
+const char* Pcsx2Config::GSOptions::BezelFitModeNames[] = {
+	"Fit",
+	"Fill",
+	"Stretch",
+	"Center",
+	nullptr,
+};
+
 const char* Pcsx2Config::GSOptions::BlendingLevelNames[] = {
 	"Minimum",
 	"Basic",
@@ -819,6 +827,14 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(Crop[2]) &&
 		OpEqu(Crop[3]) &&
 
+		OpEqu(BezelEnabled) &&
+		OpEqu(BezelPath) &&
+		OpEqu(BezelOpacity) &&
+		OpEqu(BezelScale) &&
+		OpEqu(BezelFitMode) &&
+		OpEqu(BezelShowInFullscreen) &&
+		OpEqu(BezelShowInBigPicture) &&
+
 		OpEqu(OsdScale) &&
 		OpEqu(OsdMargin) &&
 		OpEqu(OsdFontPath) &&
@@ -946,6 +962,14 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapEntryEx(Crop[1], "CropTop");
 	SettingsWrapEntryEx(Crop[2], "CropRight");
 	SettingsWrapEntryEx(Crop[3], "CropBottom");
+
+	SettingsWrapBitBool(BezelEnabled);
+	SettingsWrapEntry(BezelPath);
+	SettingsWrapEntry(BezelOpacity);
+	SettingsWrapEntry(BezelScale);
+	SettingsWrapEnumEx(BezelFitMode, "BezelFitMode", BezelFitModeNames);
+	SettingsWrapBitBool(BezelShowInFullscreen);
+	SettingsWrapBitBool(BezelShowInBigPicture);
 
 	// Unfortunately, because code in the GS still reads the setting by key instead of
 	// using these variables, we need to use the old names. Maybe post 2.0 we can change this.
@@ -2002,6 +2026,7 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 	SettingsWrapBitBool(ManuallySetRealTimeClock);
 	SettingsWrapBitBool(UseSystemLocaleFormat);
 
+
 	// Process various sub-components:
 
 	Speedhacks.LoadSave(wrap);
@@ -2009,6 +2034,7 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 	GS.LoadSave(wrap);
 	SPU2.LoadSave(wrap);
 	DEV9.LoadSave(wrap);
+	Arcade.LoadSave(wrap);
 	Gamefixes.LoadSave(wrap);
 	Profiler.LoadSave(wrap);
 	Savestate.LoadSave(wrap);
@@ -2388,4 +2414,29 @@ std::string EmuFolders::GetOverridableResourcePath(std::string_view name)
 	}
 
 	return upath;
+}
+
+
+void Pcsx2Config::ArcadeOptions::LoadSave(SettingsWrapper& wrap)
+{
+	{
+		SettingsWrapSection("Arcade");
+		SettingsWrapEntry(ATAVerboseReads);
+		SettingsWrapEntry(RAMVerboseReads);
+		SettingsWrapEntry(SRAMVerboseReads);
+		SettingsWrapEntry(UARTVerbose);
+	}
+}
+
+bool Pcsx2Config::ArcadeOptions::operator!=(const ArcadeOptions& right) const
+{
+	return !this->operator==(right);
+}
+
+bool Pcsx2Config::ArcadeOptions::operator==(const ArcadeOptions& right) const
+{
+	return OpEqu(ATAVerboseReads) &&
+		   OpEqu(RAMVerboseReads) &&
+		   OpEqu(UARTVerbose) &&
+		   OpEqu(SRAMVerboseReads);
 }

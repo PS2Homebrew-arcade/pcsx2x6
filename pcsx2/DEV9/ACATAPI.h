@@ -35,6 +35,7 @@ namespace ACATAPI
     void Setup(); // change ACATA stuff to handle CDROM instead of HDD
     u16 pio_read_word();
     bool has_pio_data();
+    void chunk_poll();
     void pio_write_word(u16 val);
     bool has_pio_write();
     bool dma_read(u32* pMem, int size);

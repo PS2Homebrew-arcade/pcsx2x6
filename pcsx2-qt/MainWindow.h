@@ -146,6 +146,8 @@ private Q_SLOTS:
 	void onGameListSelectionChanged();
 	void onGameListEntryActivated();
 	void onGameListEntryContextMenuRequested(const QPoint& point);
+	void setGameListEntryBezelImage(const GameList::Entry& entry);
+	void clearGameListEntryBezelImage(const GameList::Entry& entry);
 
 	void onStartFileActionTriggered();
 	void onStartDiscActionTriggered();

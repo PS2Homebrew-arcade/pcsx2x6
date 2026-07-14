@@ -81,6 +81,9 @@ namespace Host
 	/// Requests a specific display window size.
 	void RequestResizeHostDisplay(s32 width, s32 height);
 
+	/// Returns true when the GS display is currently in fullscreen mode.
+	bool IsFullscreen();
+
 	/// Safely executes a function on the VM thread.
 	void RunOnCPUThread(std::function<void()> function, bool block = false);
 
