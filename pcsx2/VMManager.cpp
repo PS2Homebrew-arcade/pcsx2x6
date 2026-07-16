@@ -1357,7 +1357,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				s_imgname = INI.GetStringValue("data", "mediasrc");
 				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
 				if (!ArcadeiLinkID.empty() &&
-					(ArcadeiLinkID == "ASIA4" || ArcadeiLinkID == "ASIA5" || ArcadeiLinkID == "JAPAN")) {
+					(ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN")) {
 					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
 					return false;
 				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
