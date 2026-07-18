@@ -37,7 +37,7 @@
         "input": {
           "type": "string",
           "description": "game input type",
-          "pattern": "^(driving|button|lightgun|touchscreen|drum)$"
+          "pattern": "^(driving|button|lightgun|touchscreen|drum|twinstick)$"
         },
         "compat": {
           "type": "integer",
