@@ -113,6 +113,11 @@ namespace ACJV {
     u16 Read16(u32 addr);
     void Write16(u32 addr, u16 val);
     void UpdateFcaFrame(); // Ridge Racer V: refresh the FCA-1 I/O board's input buffer every frame (steering/pedals/buttons)
+    void SetTouchPressed(bool pressed);
+    void SetTouchPressBound(bool bound);
+    void SetTouchRelativeAxis(u32 axis, float value); // 0..3 = Left/Right/Up/Down stick deflection
+    void SetTouchRelativeActive(bool active);
+    void SetTouchCursor(std::string path, float scale, u32 color);
     void OnBoardStart();   // set the JVS I/O board firmware version at power-on (Battle Gear 3 Tuned reads it before its first command)
     extern enum BOARDID CurrentBoardID;
 
@@ -210,6 +215,7 @@ enum JVS { //https://github.com/TheOnlyJoey/openjvs/wiki/Command-list
     OUTPUT_GENERAL_PURPOSE3 = 0x38, //general-purpose output 3
     /// Manufacturer-specific
     //60-7F	 	reserved for manufacturer-specific commands
+    NAMCO_VENDOR = 0x70, //Namco extended command: sub-command + args (FCB touch panel init/status)
 };
 
 enum COINCOND { // Coin Slot condition

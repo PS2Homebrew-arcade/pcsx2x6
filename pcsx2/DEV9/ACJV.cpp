@@ -5,6 +5,7 @@
 #include "Config.h"
 #include "Host.h"
 #include "Input/InputManager.h"
+#include "ImGui/ImGuiManager.h"
 #include "GS/GS.h"
 #include "common/SettingsInterface.h"
 #include <algorithm>
@@ -428,6 +429,13 @@ static constexpr const char* s_drum_games[] = {
 	"NM00046", "NM00051", "NM00053", "NM00054", "NM00056", "NM00057",
 };
 static constexpr const char* s_twinstick_games[] = {"NM00016", "NM00025"};
+static constexpr const char* s_touch_games[] = { // V290 FCB touch panel games
+	"NM00014", // Dragon Chronicle
+	"NM00020", // Dragon Chronicle Online
+	"NM00022", // THE IDOLM@STER
+	"NM00028", // Druaga Online
+	"NM00036", // Zenno Training (Whole Brain)
+};
 
 // Derive the JVS device mode from the gameid alone (jvsmode= is an optional override, see VMManager).
 JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
@@ -440,6 +448,8 @@ JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
 		return JVS_MODE::DRUM;
 	if (std::ranges::find(s_twinstick_games, gameid) != std::ranges::end(s_twinstick_games))
 		return JVS_MODE::TWINSTICK;
+	if (std::ranges::find(s_touch_games, gameid) != std::ranges::end(s_touch_games))
+		return JVS_MODE::TOUCH;
 	return JVS_MODE::DEFAULT;
 }
 
@@ -646,6 +656,8 @@ void ACJV::SetGameId(const std::string& gameid)
 		CurrentBoardID = MIU_IO_JPN_GUN_EXTENTI;
 	else if (gameid == "NM00010" || gameid == "NM00015")
 		CurrentBoardID = TAITO_BG3_IO_PCB; // BG3/BG3T: real Taito K91X0951A board ID (from the F22 EPROM dump)
+	else if (std::ranges::find(s_touch_games, gameid) != std::ranges::end(s_touch_games))
+		CurrentBoardID = FCB_JPN_TOUCHPANEL; // touch games use the V290 FCB PCB
 	else
 		CurrentBoardID = RAYS_PCB;
 }
@@ -696,6 +708,70 @@ static void UpdateLightgunFromMouse()
 		if (gm.sensor)
 			ACJV::SetButtonState(p, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
 	}
+}
+
+static bool m_touchPressed = false;
+static bool m_touchPressBound = false;
+static bool m_touchRelActive = false;
+static float m_touchRel[4] = {}; // Left/Right/Up/Down stick deflection
+static std::string m_touchCursorPath;
+
+void ACJV::SetTouchPressed(bool pressed) { m_touchPressed = pressed; }
+void ACJV::SetTouchPressBound(bool bound) { m_touchPressBound = bound; }
+void ACJV::SetTouchRelativeAxis(u32 axis, float value) { if (axis < std::size(m_touchRel)) m_touchRel[axis] = value; }
+void ACJV::SetTouchRelativeActive(bool active) { m_touchRelActive = active; }
+
+// Relative aim draws on its own software-cursor slot (past the guns' MAX+port slots); the mouse shares slot 0.
+static u32 TouchPointerIndex() { return m_touchRelActive ? (InputManager::MAX_POINTER_DEVICES + 2) : 0; }
+
+void ACJV::SetTouchCursor(std::string path, float scale, u32 color)
+{
+	static bool s_shown = false;
+	static u32 s_prev_index = 0;
+	const bool want = (ACJV::GetMode() == JVS_MODE::TOUCH) && !path.empty();
+	const u32 index = TouchPointerIndex();
+	if (s_shown && (!want || s_prev_index != index))
+		ImGuiManager::ClearSoftwareCursor(s_prev_index);
+	m_touchCursorPath = want ? path : std::string();
+	if (want)
+		ImGuiManager::SetSoftwareCursor(index, std::move(path), scale, color);
+	s_shown = want;
+	s_prev_index = index;
+}
+
+// Touch panel pointer: the mouse, or a controller stick via the relative-aim binds (stick deflection maps to
+// the whole screen, like the lightgun relative aim). Touching = the TouchPress bind, or left click when unbound.
+// FCB reports X=Y=0xFFFF when the panel isn't touched.
+static void UpdateTouchFromPointer()
+{
+	float wx, wy;
+	if (m_touchRelActive)
+	{
+		wx = (((m_touchRel[1] > 0.0f) ? m_touchRel[1] : -m_touchRel[0]) + 1.0f) * 0.5f * ImGuiManager::GetWindowWidth();
+		wy = (((m_touchRel[3] > 0.0f) ? m_touchRel[3] : -m_touchRel[2]) + 1.0f) * 0.5f * ImGuiManager::GetWindowHeight();
+	}
+	else
+	{
+		const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(0);
+		wx = mx;
+		wy = my;
+	}
+	if (!m_touchCursorPath.empty())
+		ImGuiManager::SetSoftwareCursorPosition(TouchPointerIndex(), wx, wy);
+
+	const bool pressed = m_touchPressBound ? m_touchPressed : InputManager::IsPointerButtonDown(0, 0);
+	if (!pressed)
+	{
+		m_jvsScreenPosX[0] = 0xFFFF;
+		m_jvsScreenPosY[0] = 0xFFFF;
+		return;
+	}
+	float mdx, mdy;
+	GSTranslateWindowToDisplayCoordinates(wx, wy, &mdx, &mdy);
+	const float cx = (mdx < 0.0f) ? 0.0f : (mdx > 1.0f ? 1.0f : mdx);
+	const float cy = (mdy < 0.0f) ? 0.0f : (mdy > 1.0f ? 1.0f : mdy);
+	m_jvsScreenPosX[0] = std::min<u16>(static_cast<u16>(cx * 0xFFFF), 0xFFFE);
+	m_jvsScreenPosY[0] = std::min<u16>(static_cast<u16>((1.0f - cy) * 0xFFFF), 0xFFFE); // FCB Y axis is bottom-up
 }
 
 // Combine host axes into the 3 JVS analog channels (steer/gas/brake). Steering encoding is per-game.
@@ -838,8 +914,6 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 				(*dstSize) += 4;
 			}
-			// TODO: touch panel games
-#if 0
 			else if(m_jvsMode == JVS_MODE::TOUCH)
 			{
 				(*output++) = 0x06; //Screen Pos Input
@@ -849,7 +923,6 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 				(*dstSize) += 4;
 			}
-#endif
 			(*output++) = 0x00; //End of features
 
 			(*dstSize) += 10;
@@ -1020,6 +1093,8 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 			if(m_jvsMode == JVS_MODE::LIGHTGUN)
 				UpdateLightgunFromMouse();
+			else if(m_jvsMode == JVS_MODE::TOUCH)
+				UpdateTouchFromPointer();
 
 			(*output++) = JVS_CMD_SUCCESS;
 
@@ -1031,7 +1106,12 @@ void do_jvs_packet(const u8* input, u8* output) {
 			// frame), so return that one gun's player position - gun 1 -> P1, gun 2 -> P2.
 			const u32 pl = (channel >= 1 && channel <= JVS_PLAYER_COUNT) ? (channel - 1u) : 0u;
 			u16 posX = 0, posY = 0;
-			if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX[pl] >= 0.0f)
+			if(m_jvsMode == JVS_MODE::TOUCH)
+			{
+				posX = m_jvsScreenPosX[0];
+				posY = m_jvsScreenPosY[0];
+			}
+			else if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX[pl] >= 0.0f)
 			{
 				const float scaleX = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 640.0f : 0xFFFF;
 				const float scaleY = (ACJV::CurrentBoardID == MIU_IO_JPN_GUN_EXTENTI) ? 224.0f : 0xFFFF;
@@ -1077,6 +1157,31 @@ void do_jvs_packet(const u8* input, u8* output) {
 
 			(*output++) = JVS_CMD_SUCCESS;
 			(*dstSize) += 1;
+		}
+		break;
+		// Namco vendor command: a sub-command byte plus its args (0x60 status = 1 arg, 0x62 touch
+		// initialize = 2 args, 0x18 boot config = 4 args). We echo the sub-command and report 0x01,
+		// which is the "ready" the game waits on to finish INITIALIZE.
+		case JVS::NAMCO_VENDOR:
+		{
+			JVS_ASSERT(inSize != 0);
+			u8 sub = (*input++);
+			inWorkChecksum += sub;
+			inSize--;
+
+			u8 args = (sub == 0x60) ? 1 : (sub == 0x62) ? 2 : (sub == 0x18) ? 4 : inSize;
+			for(u8 i = 0; i < args && inSize != 0; i++)
+			{
+				u8 data = (*input++);
+				inWorkChecksum += data;
+				inSize--;
+			}
+
+			(*output++) = JVS_CMD_SUCCESS;
+			(*output++) = 0x02; //payload length
+			(*output++) = sub;  //sub-command echo
+			(*output++) = 0x01; //status: ready
+			(*dstSize) += 4;
 		}
 		break;
 		default:

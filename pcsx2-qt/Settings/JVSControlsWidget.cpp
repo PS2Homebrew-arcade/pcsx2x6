@@ -90,6 +90,7 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 	buildTwinstickPage();
 	buildLightgunPage();
 	buildStandardPage();
+	buildTouchPage();
 
 	// Settings view: analog tuning (deadzone/sensitivity) for the JVS steering and pedals.
 	{
@@ -143,6 +144,7 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 	m_ui.pageSelector->addItem(tr("Twinstick"));
 	m_ui.pageSelector->addItem(tr("Lightgun"));
 	m_ui.pageSelector->addItem(tr("Standard"));
+	m_ui.pageSelector->addItem(tr("Touch Panel"));
 	connect(m_ui.pageSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
 		m_ui.pageStack, &QStackedWidget::setCurrentIndex);
 
@@ -329,6 +331,7 @@ void JVSControlsWidget::autoPickInputPage()
 		case JVS_MODE::TWINSTICK: page = 4; break;
 		case JVS_MODE::LIGHTGUN:  page = 5; break;
 		case JVS_MODE::STANDARD:  page = 6; break;
+		case JVS_MODE::TOUCH:     page = 7; break;
 		default:                  page = 0; break;
 	}
 	m_ui.pageSelector->setCurrentIndex(page);
@@ -606,6 +609,95 @@ void JVSControlsWidget::buildTwinstickPage()
 	addJvsAutomapButton(this, m_dialog, m_ui.twinstickPageLayout, std::move(binds), {});
 }
 
+// One crosshair config box (image path + scale + color) bound to the given settings keys.
+static QGroupBox* makeCrosshairBox(JVSControlsWidget* w, SettingsInterface* sif, const QString& title,
+	const std::string& section, const std::string& pathKey, const std::string& scaleKey, const std::string& colorKey)
+{
+	QGroupBox* box = new QGroupBox(title, w);
+	QGridLayout* cg = new QGridLayout(box);
+	cg->setColumnStretch(1, 1);
+
+	QLineEdit* path = new QLineEdit(box);
+	QPushButton* browse = new QPushButton(JVSControlsWidget::tr("Browse..."), box);
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileString(sif, path, section, pathKey, "");
+	QObject::connect(browse, &QPushButton::clicked, w, [w, path]() {
+		const QString p(QDir::toNativeSeparators(QFileDialog::getOpenFileName(w, JVSControlsWidget::tr("Select Crosshair Image"))));
+		if (!p.isEmpty())
+			path->setText(p);
+	});
+	QHBoxLayout* ph = new QHBoxLayout();
+	ph->addWidget(path, 1);
+	ph->addWidget(browse);
+	cg->addWidget(new QLabel(JVSControlsWidget::tr("Image"), box), 0, 0);
+	cg->addLayout(ph, 0, 1);
+
+	QDoubleSpinBox* scale = new QDoubleSpinBox(box);
+	scale->setMinimum(1);
+	scale->setMaximum(1000);
+	scale->setSingleStep(1);
+	scale->setDecimals(0);
+	scale->setSuffix(QStringLiteral("%"));
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileFloat(sif, scale, section, scaleKey, 1.0f, 100.0f);
+	cg->addWidget(new QLabel(JVSControlsWidget::tr("Scale"), box), 1, 0);
+	cg->addWidget(scale, 1, 1);
+
+	QLineEdit* color = new QLineEdit(box);
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileString(sif, color, section, colorKey, "#ffffff");
+	cg->addWidget(new QLabel(JVSControlsWidget::tr("Color"), box), 2, 0);
+	cg->addWidget(color, 2, 1);
+	return box;
+}
+
+// Fill an aim-device combo: system pointers first, then bindable controllers; select `current`.
+static void populateAimCombo(QComboBox* combo, ControllerSettingsWindow* dialog, const QString& current)
+{
+	combo->blockSignals(true);
+	combo->clear();
+	for (u32 j = 0; j < InputManager::MAX_POINTER_DEVICES; j++)
+	{
+		const QString name = (InputManager::MAX_POINTER_DEVICES == 1)
+			? JVSControlsWidget::tr("Mouse (system)") : QString::fromStdString(InputManager::GetPointerDeviceName(j));
+		combo->addItem(name, QString::fromStdString(InputManager::GetPointerDeviceName(j)));
+	}
+	for (const QPair<QString, QString>& dev : dialog->getDeviceList())
+	{
+		// Skip the "Mouse"/"Keyboard" pseudo-devices: no aim stick, and the mouse is already the pointer above.
+		if (dev.first == QLatin1String("Mouse") || dev.first == QLatin1String("Keyboard"))
+			continue;
+		combo->addItem(dev.second, dev.first);
+	}
+	const int idx = combo->findData(current);
+	combo->setCurrentIndex((idx >= 0) ? idx : 0);
+	combo->blockSignals(false);
+}
+
+// Store the chosen aim device and mirror its left stick into the 4 relative-aim binding keys
+// (cleared when the device is a system pointer, i.e. the mouse).
+static void applyAimDevice(JVSControlsWidget* w, ControllerSettingsWindow* dialog, const QString& dev,
+	const std::string& section, const char* pointerKey, const std::array<std::string, 4>& axisKeys)
+{
+	dialog->setStringValue(section.c_str(), pointerKey, dev.toUtf8().constData());
+	InputManager::GenericInputBindingMapping mapping; // stays empty for a system pointer -> clears the stick binds
+	if (!dev.startsWith(QStringLiteral("Pointer-")))
+		mapping = InputManager::GetGenericBindingMapping(dev.toStdString());
+	static constexpr GenericInputBinding stick[4] = {GenericInputBinding::LeftStickLeft,
+		GenericInputBinding::LeftStickRight, GenericInputBinding::LeftStickUp, GenericInputBinding::LeftStickDown};
+	for (int i = 0; i < 4; i++)
+	{
+		std::string host;
+		for (const auto& [gg, h] : mapping)
+			if (gg == stick[i])
+				host = h;
+		if (host.empty())
+			dialog->clearSettingValue(section.c_str(), axisKeys[i].c_str());
+		else
+			dialog->setStringValue(section.c_str(), axisKeys[i].c_str(), host.c_str());
+	}
+	for (InputBindingWidget* bw : w->findChildren<InputBindingWidget*>())
+		bw->reloadBinding();
+	g_emu_thread->applySettings();
+}
+
 // Lightgun (GunCon2) page: bind the gun's USB1/USB2 guncon2_* button keys directly here.
 void JVSControlsWidget::buildLightgunPage()
 {
@@ -649,30 +741,9 @@ void JVSControlsWidget::buildLightgunPage()
 			const QString dev = combo->currentData().toString();
 			if (dev.isEmpty())
 				return;
-			m_dialog->setStringValue(section, "guncon2_Pointer", dev.toUtf8().constData());
-			InputManager::GenericInputBindingMapping mapping; // stays empty for Mouse -> clears the stick binds below
-			if (!dev.startsWith(QStringLiteral("Pointer-")))
-				mapping = InputManager::GetGenericBindingMapping(dev.toStdString());
-			static constexpr std::pair<const char*, GenericInputBinding> axes[] = {
-				{"RelativeLeft", GenericInputBinding::LeftStickLeft},
-				{"RelativeRight", GenericInputBinding::LeftStickRight},
-				{"RelativeUp", GenericInputBinding::LeftStickUp},
-				{"RelativeDown", GenericInputBinding::LeftStickDown}};
-			for (const auto& [key, gen] : axes)
-			{
-				std::string host;
-				for (const auto& [gg, h] : mapping)
-					if (gg == gen)
-						host = h;
-				const std::string k = USB::GetConfigSubKey("guncon2", key);
-				if (host.empty())
-					m_dialog->clearSettingValue(section, k.c_str());
-				else
-					m_dialog->setStringValue(section, k.c_str(), host.c_str());
-			}
-			for (InputBindingWidget* w : findChildren<InputBindingWidget*>())
-				w->reloadBinding();
-			g_emu_thread->applySettings(); // re-read so the GunCon2 picks up the new aim source
+			applyAimDevice(this, m_dialog, dev, section, "guncon2_Pointer",
+				{USB::GetConfigSubKey("guncon2", "RelativeLeft"), USB::GetConfigSubKey("guncon2", "RelativeRight"),
+					USB::GetConfigSubKey("guncon2", "RelativeUp"), USB::GetConfigSubKey("guncon2", "RelativeDown")});
 		});
 		ag->addWidget(combo, 1, col, Qt::AlignLeft);
 	};
@@ -716,42 +787,8 @@ void JVSControlsWidget::buildLightgunPage()
 
 	// Per-player crosshair image (guncon2_cursor_* keys); clearing the path = system cursor.
 	const auto makeCrosshair = [&](const char* section, const QString& title) -> QGroupBox* {
-		QGroupBox* box = new QGroupBox(title, this);
-		QGridLayout* cg = new QGridLayout(box);
-		cg->setColumnStretch(1, 1);
-
-		QLineEdit* path = new QLineEdit(box);
-		QPushButton* browse = new QPushButton(tr("Browse..."), box);
-		ControllerSettingWidgetBinder::BindWidgetToInputProfileString(
-			sif, path, section, USB::GetConfigSubKey("guncon2", "cursor_path"), "");
-		connect(browse, &QPushButton::clicked, this, [this, path]() {
-			const QString p(QDir::toNativeSeparators(QFileDialog::getOpenFileName(this, tr("Select Crosshair Image"))));
-			if (!p.isEmpty())
-				path->setText(p);
-		});
-		QHBoxLayout* ph = new QHBoxLayout();
-		ph->addWidget(path, 1);
-		ph->addWidget(browse);
-		cg->addWidget(new QLabel(tr("Image"), box), 0, 0);
-		cg->addLayout(ph, 0, 1);
-
-		QDoubleSpinBox* scale = new QDoubleSpinBox(box);
-		scale->setMinimum(1);
-		scale->setMaximum(1000);
-		scale->setSingleStep(1);
-		scale->setDecimals(0);
-		scale->setSuffix(QStringLiteral("%"));
-		ControllerSettingWidgetBinder::BindWidgetToInputProfileFloat(
-			sif, scale, section, USB::GetConfigSubKey("guncon2", "cursor_scale"), 1.0f, 100.0f);
-		cg->addWidget(new QLabel(tr("Scale"), box), 1, 0);
-		cg->addWidget(scale, 1, 1);
-
-		QLineEdit* color = new QLineEdit(box);
-		ControllerSettingWidgetBinder::BindWidgetToInputProfileString(
-			sif, color, section, USB::GetConfigSubKey("guncon2", "cursor_color"), "#ffffff");
-		cg->addWidget(new QLabel(tr("Color"), box), 2, 0);
-		cg->addWidget(color, 2, 1);
-		return box;
+		return makeCrosshairBox(this, sif, title, section, USB::GetConfigSubKey("guncon2", "cursor_path"),
+			USB::GetConfigSubKey("guncon2", "cursor_scale"), USB::GetConfigSubKey("guncon2", "cursor_color"));
 	};
 	QHBoxLayout* crosshairRow = new QHBoxLayout();
 	crosshairRow->addWidget(makeCrosshair("USB1", tr("Crosshair (P1)")), 1);
@@ -788,6 +825,85 @@ void JVSControlsWidget::buildLightgunPage()
 	addLightgunAutomapButton(this, m_dialog, m_ui.lightgunPageLayout);
 }
 
+// Touch panel page: pointer device (mouse, or a controller stick via relative aim), touch press, crosshair.
+void JVSControlsWidget::buildTouchPage()
+{
+	SettingsInterface* sif = m_dialog->getProfileSettingsInterface();
+
+	QLabel* info = new QLabel(tr("Move the pointer with the mouse or a controller stick, and hold the Touch button "
+		"to press the panel. A tap is press then release inside the target."), this);
+	info->setWordWrap(true);
+	info->setStyleSheet("font-style: italic;");
+	m_ui.touchPageLayout->addWidget(info);
+
+	// Pointer device: mouse, or a controller whose left stick fills the relative-aim binds below.
+	QGroupBox* aimGroup = new QGroupBox(tr("Pointer Device"), this);
+	QGridLayout* ag = new QGridLayout(aimGroup);
+	ag->addWidget(new QLabel(tr("Device"), aimGroup), 0, 0);
+	QComboBox* combo = new QComboBox(aimGroup);
+	combo->setMinimumWidth(160);
+	m_touchAimCombo = combo;
+	connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this, combo](int) {
+		const QString dev = combo->currentData().toString();
+		if (dev.isEmpty())
+			return;
+		applyAimDevice(this, m_dialog, dev, ACJV::CONFIG_SECTION, "TouchPointer",
+			{"TouchRelativeLeft", "TouchRelativeRight", "TouchRelativeUp", "TouchRelativeDown"});
+	});
+	ag->addWidget(combo, 0, 1, Qt::AlignLeft);
+	ag->setColumnStretch(1, 1);
+	QHBoxLayout* top = new QHBoxLayout();
+	top->addWidget(aimGroup, 1);
+	top->addStretch(1);
+	m_ui.touchPageLayout->addLayout(top);
+
+	QGroupBox* touchGroup = new QGroupBox(tr("Touch"), this);
+	QGridLayout* tg = new QGridLayout(touchGroup);
+	QLabel* pressLabel = new QLabel(tr("Touch (tap)"), touchGroup);
+	tg->addWidget(pressLabel, 0, 0);
+	InputBindingWidget* press = new InputBindingWidget(touchGroup, sif, InputBindingInfo::Type::Button, ACJV::CONFIG_SECTION, "TouchPress");
+	press->setMinimumWidth(140);
+	press->setMaximumWidth(140);
+	tg->addWidget(press, 0, 1);
+	new HoverHighlight(press, pressLabel);
+	QLabel* pressNote = new QLabel(tr("Left mouse button when unbound."), touchGroup);
+	pressNote->setStyleSheet("font-style: italic;");
+	tg->addWidget(pressNote, 1, 0, 1, 2);
+	tg->setColumnStretch(0, 1);
+	tg->setRowStretch(2, 1);
+
+	QGroupBox* rel = new QGroupBox(tr("Relative Aim (stick)"), this);
+	QGridLayout* rg = new QGridLayout(rel);
+	const auto relRow = [&](int r, const QString& label, const char* key) {
+		QLabel* desc = new QLabel(label, rel);
+		rg->addWidget(desc, r, 0);
+		InputBindingWidget* wdg = new InputBindingWidget(rel, sif, InputBindingInfo::Type::HalfAxis, ACJV::CONFIG_SECTION, key);
+		wdg->setMinimumWidth(140);
+		wdg->setMaximumWidth(140);
+		rg->addWidget(wdg, r, 1);
+		new HoverHighlight(wdg, desc);
+	};
+	relRow(0, tr("Up"), "TouchRelativeUp");
+	relRow(1, tr("Down"), "TouchRelativeDown");
+	relRow(2, tr("Left"), "TouchRelativeLeft");
+	relRow(3, tr("Right"), "TouchRelativeRight");
+	rg->setColumnStretch(0, 1);
+
+	QHBoxLayout* mid = new QHBoxLayout();
+	mid->addWidget(touchGroup, 1);
+	mid->addWidget(rel, 1);
+	m_ui.touchPageLayout->addLayout(mid);
+
+	// Crosshair for the touch pointer (needed to see where a controller stick points).
+	QHBoxLayout* crossRow = new QHBoxLayout();
+	crossRow->addWidget(makeCrosshairBox(this, sif, tr("Crosshair"), ACJV::CONFIG_SECTION,
+		"TouchCursorPath", "TouchCursorScale", "TouchCursorColor"), 1);
+	crossRow->addStretch(1);
+	m_ui.touchPageLayout->addLayout(crossRow);
+
+	m_ui.touchPageLayout->addStretch(1);
+}
+
 void JVSControlsWidget::buildStandardPage()
 {
 	buildJvsLayoutPage(this, m_dialog->getProfileSettingsInterface(), m_dialog,
@@ -800,29 +916,15 @@ void JVSControlsWidget::refreshAimDevices()
 	const char* sections[2] = {"USB1", "USB2"};
 	for (int i = 0; i < 2; i++)
 	{
-		QComboBox* combo = m_aimCombos[i];
-		if (!combo)
+		if (!m_aimCombos[i])
 			continue;
-		combo->blockSignals(true);
-		combo->clear();
-		for (u32 j = 0; j < InputManager::MAX_POINTER_DEVICES; j++)
-		{
-			const QString name = (InputManager::MAX_POINTER_DEVICES == 1)
-				? tr("Mouse (system)") : QString::fromStdString(InputManager::GetPointerDeviceName(j));
-			combo->addItem(name, QString::fromStdString(InputManager::GetPointerDeviceName(j)));
-		}
-		for (const QPair<QString, QString>& dev : m_dialog->getDeviceList())
-		{
-			// Skip the "Mouse"/"Keyboard" pseudo-devices: no aim stick, and the mouse is already the pointer above.
-			if (dev.first == QLatin1String("Mouse") || dev.first == QLatin1String("Keyboard"))
-				continue;
-			combo->addItem(dev.second, dev.first);
-		}
-		const QString want = QString::fromStdString(m_dialog->getStringValue(sections[i], "guncon2_Pointer",
-			InputManager::GetPointerDeviceName(0).c_str()));
-		const int idx = combo->findData(want);
-		combo->setCurrentIndex((idx >= 0) ? idx : 0);
-		combo->blockSignals(false);
+		populateAimCombo(m_aimCombos[i], m_dialog, QString::fromStdString(m_dialog->getStringValue(
+			sections[i], "guncon2_Pointer", InputManager::GetPointerDeviceName(0).c_str())));
+	}
+	if (m_touchAimCombo)
+	{
+		populateAimCombo(m_touchAimCombo, m_dialog, QString::fromStdString(m_dialog->getStringValue(
+			ACJV::CONFIG_SECTION, "TouchPointer", InputManager::GetPointerDeviceName(0).c_str())));
 	}
 }
 

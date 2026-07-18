@@ -268,6 +268,12 @@
                <property name="rightMargin"><number>0</number></property>
               </layout>
              </widget>
+             <widget class="QWidget" name="touchPage">
+              <layout class="QVBoxLayout" name="touchPageLayout">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+              </layout>
+             </widget>
             </widget>
            </item>
           </layout>

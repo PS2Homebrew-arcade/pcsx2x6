@@ -38,6 +38,7 @@ private:
 	void buildTwinstickPage();
 	void buildLightgunPage();
 	void buildStandardPage();
+	void buildTouchPage();
 	void refreshAimDevices();
 	void refreshMacrosPage(); // rebuild the Macros view (layout dropdown + per-layout rows)
 	void buildMacroRows(QVBoxLayout* rowsLayout, const std::string& layoutKey, std::span<const InputBindingInfo> lbuttons);
@@ -46,4 +47,5 @@ private:
 	ControllerSettingsWindow* m_dialog;
 	std::string m_autoPickedGameId;
 	QComboBox* m_aimCombos[2] = {}; // [0] = USB1/P1, [1] = USB2/P2
+	QComboBox* m_touchAimCombo = nullptr;
 };
