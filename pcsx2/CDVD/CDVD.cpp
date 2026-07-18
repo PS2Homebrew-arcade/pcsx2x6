@@ -139,7 +139,7 @@ const NVMLayout* getNvmLayout() noexcept
 
 static void cdvdCreateNewNVM()
 {
-	std::memset(s_nvram, 0, sizeof(s_nvram));
+	std::memset(s_nvram, 0xFF, sizeof(s_nvram));
 
 	// Write NVM ILink area with dummy data (Age of Empires 2)
 	// Also write language data defaulting to English (Guitar Hero 2)
