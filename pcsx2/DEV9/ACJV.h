@@ -73,6 +73,7 @@ enum class StandardLayout {
 	SMASHCOURT,  // NM00006: Smash Court Pro (2 buttons)
 	TECHNICBEAT, // NM10003: Technic Beat (3 buttons)
 	GUNDAMQUIZ,  // NM00030: Gundam Quiz Warrior (4-button Gundam wiring)
+	INUFUKU,     // NM00037: Quiz Inufuku 2 (answer buttons 1-4 on the directional bits)
 };
 
 #define JVS_WHEEL_CHANNEL_MAX 3
