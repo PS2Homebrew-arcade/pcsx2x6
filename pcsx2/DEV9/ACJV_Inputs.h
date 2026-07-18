@@ -215,10 +215,10 @@ static constexpr InputBindingInfo s_standard_inufuku[] = {
 };
 // Gundam Quiz Warrior (NM00030): a quiz, but on the same 4-button wiring as the Gundam VS games (own keys).
 static constexpr InputBindingInfo s_standard_gundamquiz[] = {
-	{"GundamQuiz_Shoot",  TRANSLATE_NOOP("JVS", "Shoot"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_1, GenericInputBinding::Square},
-	{"GundamQuiz_Melee",  TRANSLATE_NOOP("JVS", "Melee"),  nullptr, InputBindingInfo::Type::Button, JVS_BTN_2, GenericInputBinding::Triangle},
-	{"GundamQuiz_Jump",   TRANSLATE_NOOP("JVS", "Jump"),   nullptr, InputBindingInfo::Type::Button, JVS_BTN_3, GenericInputBinding::Cross},
-	{"GundamQuiz_Target", TRANSLATE_NOOP("JVS", "Target"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_4, GenericInputBinding::Circle},
+	{"GundamQuiz_Target", TRANSLATE_NOOP("JVS", "Answer A"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_4, GenericInputBinding::Circle},
+	{"GundamQuiz_Shoot",  TRANSLATE_NOOP("JVS", "Answer B"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_1, GenericInputBinding::Square},
+	{"GundamQuiz_Melee",  TRANSLATE_NOOP("JVS", "Answer C"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_2, GenericInputBinding::Triangle},
+	{"GundamQuiz_Jump",   TRANSLATE_NOOP("JVS", "Answer D"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_3, GenericInputBinding::Cross},
 };
 
 // Standard page: section title + action buttons per layout.
