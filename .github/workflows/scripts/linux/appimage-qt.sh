@@ -99,8 +99,8 @@ for i in $(find "$DEPSDIR" -iname '*.so'); do
 done
 
 echo "Copying desktop file..."
-cp "$PCSX2DIR/.github/workflows/scripts/linux/pcsx2-qt.desktop" "net.pcsx2.PCSX2.desktop"
-cp "$PCSX2DIR/bin/resources/icons/AppIconLarge.png" "PCSX2.png"
+cp "$PCSX2DIR/.github/workflows/scripts/linux/pcsx2-qt.desktop" "io.github.PS2Homebrew_arcade.PCSX2x6.desktop"
+cp "$PCSX2DIR/bin/resources/icons/AppIconLarge.png" "PCSX2x6.png"
 
 echo "Running linuxdeploy to create AppDir..."
 # The wayland platform plugin requires the plugins deployed for the waylandcompositor module
@@ -112,7 +112,7 @@ DEPLOY_PLATFORM_THEMES="1" \
 QMAKE="$DEPSDIR/bin/qmake" \
 NO_STRIP="1" \
 $LINUXDEPLOY --plugin qt --appdir="$OUTDIR" --executable="$BUILDDIR/bin/pcsx2-qt" ${EXTRA_LIBS_ARGS[@]} \
---desktop-file="net.pcsx2.PCSX2.desktop" --icon-file="PCSX2.png"
+--desktop-file="io.github.PS2Homebrew_arcade.PCSX2x6.desktop" --icon-file="PCSX2x6.png"
 
 echo "Copying resources into AppDir..."
 cp -a "$BUILDDIR/bin/resources" "$OUTDIR/usr/bin"
@@ -128,7 +128,7 @@ cp -a "$BUILDDIR/bin/translations" "$OUTDIR/usr/bin"
 # Generate AppStream meta-info.
 echo "Generating AppStream metainfo..."
 mkdir -p "$OUTDIR/usr/share/metainfo"
-"$SCRIPTDIR/generate-metainfo.sh" "$OUTDIR/usr/share/metainfo/net.pcsx2.PCSX2.appdata.xml"
+"$SCRIPTDIR/generate-metainfo.sh" "$OUTDIR/usr/share/metainfo/io.github.PS2Homebrew_arcade.PCSX2x6.appdata.xml"
 
 echo "Generating AppImage..."
 GIT_VERSION=$(git tag --points-at HEAD)
