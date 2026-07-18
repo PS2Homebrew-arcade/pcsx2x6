@@ -650,23 +650,28 @@ void JVSControlsWidget::buildLightgunPage()
 			if (dev.isEmpty())
 				return;
 			m_dialog->setStringValue(section, "guncon2_Pointer", dev.toUtf8().constData());
-			// A controller -> auto-fill this player's Relative Aim from its left stick. Mouse needs nothing.
+			InputManager::GenericInputBindingMapping mapping; // stays empty for Mouse -> clears the stick binds below
 			if (!dev.startsWith(QStringLiteral("Pointer-")))
+				mapping = InputManager::GetGenericBindingMapping(dev.toStdString());
+			static constexpr std::pair<const char*, GenericInputBinding> axes[] = {
+				{"RelativeLeft", GenericInputBinding::LeftStickLeft},
+				{"RelativeRight", GenericInputBinding::LeftStickRight},
+				{"RelativeUp", GenericInputBinding::LeftStickUp},
+				{"RelativeDown", GenericInputBinding::LeftStickDown}};
+			for (const auto& [key, gen] : axes)
 			{
-				const auto mapping = InputManager::GetGenericBindingMapping(dev.toStdString());
-				const auto host = [&](GenericInputBinding g) -> std::string {
-					for (const auto& [gg, h] : mapping)
-						if (gg == g)
-							return h;
-					return std::string();
-				};
-				m_dialog->setStringValue(section, USB::GetConfigSubKey("guncon2", "RelativeLeft").c_str(),  host(GenericInputBinding::LeftStickLeft).c_str());
-				m_dialog->setStringValue(section, USB::GetConfigSubKey("guncon2", "RelativeRight").c_str(), host(GenericInputBinding::LeftStickRight).c_str());
-				m_dialog->setStringValue(section, USB::GetConfigSubKey("guncon2", "RelativeUp").c_str(),    host(GenericInputBinding::LeftStickUp).c_str());
-				m_dialog->setStringValue(section, USB::GetConfigSubKey("guncon2", "RelativeDown").c_str(),  host(GenericInputBinding::LeftStickDown).c_str());
-				for (InputBindingWidget* w : findChildren<InputBindingWidget*>())
-					w->reloadBinding();
+				std::string host;
+				for (const auto& [gg, h] : mapping)
+					if (gg == gen)
+						host = h;
+				const std::string k = USB::GetConfigSubKey("guncon2", key);
+				if (host.empty())
+					m_dialog->clearSettingValue(section, k.c_str());
+				else
+					m_dialog->setStringValue(section, k.c_str(), host.c_str());
 			}
+			for (InputBindingWidget* w : findChildren<InputBindingWidget*>())
+				w->reloadBinding();
 			g_emu_thread->applySettings(); // re-read so the GunCon2 picks up the new aim source
 		});
 		ag->addWidget(combo, 1, col, Qt::AlignLeft);

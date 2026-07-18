@@ -541,10 +541,10 @@ namespace usb_lightgun
 
 		const s32 prev_pointer_index = s->GetSoftwarePointerIndex();
 
-		s->has_relative_binds = (USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeLeft") ||
-			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeRight") ||
-			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeUp") ||
-			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeDown"));
+		s->has_relative_binds = (!USB::GetConfigString(si, s->port, TypeName(), "RelativeLeft").empty() ||
+			!USB::GetConfigString(si, s->port, TypeName(), "RelativeRight").empty() ||
+			!USB::GetConfigString(si, s->port, TypeName(), "RelativeUp").empty() ||
+			!USB::GetConfigString(si, s->port, TypeName(), "RelativeDown").empty()); // empty/cleared binds must not latch relative aim
 
 		// Arcade aim goes through ACJV; the Aim Device is either the mouse (Pointer-N) or a controller stick.
 		const bool joystick_aim = !pointer_binding.empty() && !StringUtil::StartsWithNoCase(pointer_binding, "Pointer-");
@@ -562,10 +562,13 @@ namespace usb_lightgun
 
 		if (cursor_changed)
 		{
-			// Only clear a gun's own dedicated slot; slot 0 is the shared mouse pointer (another player/gun
-			// may be aiming with it), so switching this gun off it must not yank slot 0 out from under them.
-			if (prev_pointer_index != new_pointer_index && prev_pointer_index >= static_cast<s32>(InputManager::MAX_POINTER_DEVICES))
-				ImGuiManager::ClearSoftwareCursor(prev_pointer_index);
+			const u32 other_port = s->port ^ 1u;
+			const bool other_aims_mouse = USB::GetConfigDevice(si, other_port) == TypeName() &&
+				StringUtil::StartsWithNoCase(USB::GetConfigString(si, other_port, TypeName(), "Pointer"), "Pointer-") &&
+				!USB::GetConfigString(si, other_port, TypeName(), "cursor_path").empty();
+			if (prev_pointer_index != new_pointer_index &&
+				(prev_pointer_index >= static_cast<s32>(InputManager::MAX_POINTER_DEVICES) || !other_aims_mouse))
+				ImGuiManager::ClearSoftwareCursor(prev_pointer_index); // shared slot 0: keep only while the other gun aims with it
 
 			const bool had_software_cursor = !s->cursor_path.empty();
 
