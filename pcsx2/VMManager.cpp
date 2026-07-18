@@ -903,6 +903,11 @@ std::string VMManager::GetDebuggerSettingsFilePathForCurrentGame()
 	return GetDebuggerSettingsFilePath(s_disc_serial, s_current_crc);
 }
 
+static u32 GetCRCForPatches()
+{
+	return s_acgame.empty() ? s_current_crc : 0; // arcade: patches are keyed by the gameid alone
+}
+
 void VMManager::Internal::UpdateEmuFolders()
 {
 	const std::string old_cheats_directory(EmuFolders::Cheats);
@@ -918,7 +923,7 @@ void VMManager::Internal::UpdateEmuFolders()
 	if (VMManager::HasValidVM())
 	{
 		if (EmuFolders::Cheats != old_cheats_directory || EmuFolders::Patches != old_patches_directory)
-			Patch::ReloadPatches(s_disc_serial, s_current_crc, true, false, true, true);
+			Patch::ReloadPatches(s_disc_serial, GetCRCForPatches(), true, false, true, true);
 
 		if (EmuFolders::MemoryCards != old_memcards_directory)
 		{
@@ -1215,7 +1220,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 	ApplySettings();
 
 	// Patches are game-dependent, thus should get applied after game settings ia loaded.
-	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? s_current_crc : 0, true, true, false, false);
+	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? GetCRCForPatches() : 0, true, true, false, false);
 
 	ReportGameChangeToHost();
 	if (MTGS::IsOpen())
@@ -1252,7 +1257,7 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	Achievements::GameChanged(s_disc_crc, crc_to_report);
 
 	Console.WriteLn(Color_StrongOrange, fmt::format("ELF changed, active CRC {:08X} ({})", crc_to_report, s_elf_path));
-	Patch::ReloadPatches(s_disc_serial, crc_to_report, false, false, false, verbose_patches_if_changed);
+	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? GetCRCForPatches() : 0, false, false, false, verbose_patches_if_changed);
 	ApplyCoreSettings();
 }
 
@@ -1273,7 +1278,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	}
 
 	elfo.LoadHeaders();
-	s_current_crc = s_acgame.empty() ? elfo.GetCRC() : 0; // arcade: identity is the .acgame (crc 0), proverb.elf or boot.elf alike
+	s_current_crc = elfo.GetCRC();
 	s_elf_entry_point = elfo.GetEntryPoint();
 	s_elf_text_range = elfo.GetTextRange();
 	s_elf_path = std::move(elf_path);
@@ -3408,7 +3413,7 @@ void VMManager::ReloadPatches(bool reload_files, bool reload_enabled_list, bool 
 	if (!HasValidVM())
 		return;
 
-	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? s_current_crc : 0, reload_files, reload_enabled_list, verbose, verbose_if_changed);
+	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? GetCRCForPatches() : 0, reload_files, reload_enabled_list, verbose, verbose_if_changed);
 
 	// Might change widescreen mode.
 	if (Patch::ReloadPatchAffectingOptions())
