@@ -223,7 +223,7 @@ void GameListWidget::initialize()
 	m_ui.stack->installEventFilter(this);
 	m_ui.stack->setAutoFillBackground(false);
 
-	for (u32 type = static_cast<u32>(GameList::Region::SYSTEM246); type < static_cast<u32>(GameList::EntryType::Count); type++)
+	for (u32 type = 0; type < static_cast<u32>(GameList::EntryType::Count); type++)
 	{
 		if (type != static_cast<u32>(GameList::EntryType::Invalid))
 		{
