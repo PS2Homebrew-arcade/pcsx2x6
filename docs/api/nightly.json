@@ -1,74 +1,74 @@
 {
     "data": [
         {
-            "version": "v0.2.4",
-            "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/tag/v0.2.4",
+            "version": "v0.2.5",
+            "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/tag/v0.2.5",
             "semverMajor": 0,
             "semverMinor": 2,
-            "semverPatch": 4,
-            "description": "- [CI: rebrand the Linux AppImage desktop identity to PCSX2x6](https://github.com/PS2Homebrew-arcade/pcsx2x6/pull/118)\n\n----",
+            "semverPatch": 5,
+            "description": "- [JVS: add Quiz Suku Suku Inufuku 2 (NM00037) standard layout](https://github.com/PS2Homebrew-arcade/pcsx2x6/pull/119)\n\n----",
             "assets": {
                 "Linux": [
                     {
-                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.4/pcsx2x6-v0.2.4-linux-appimage-x64-Qt.AppImage",
-                        "displayName": "pcsx2x6-v0.2.4-linux-appimage-x64-Qt.AppImage",
+                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.5/pcsx2x6-v0.2.5-linux-appimage-x64-Qt.AppImage",
+                        "displayName": "pcsx2x6-v0.2.5-linux-appimage-x64-Qt.AppImage",
                         "additionalTags": [
                             "x64",
                             "Qt"
                         ],
                         "downloadCount": 0,
-                        "size": 57960952
+                        "size": 57952760
                     },
                     {
-                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.4/pcsx2x6-v0.2.4-linux-flatpak-x64-Qt.flatpak",
-                        "displayName": "pcsx2x6-v0.2.4-linux-flatpak-x64-Qt.flatpak",
+                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.5/pcsx2x6-v0.2.5-linux-flatpak-x64-Qt.flatpak",
+                        "displayName": "pcsx2x6-v0.2.5-linux-flatpak-x64-Qt.flatpak",
                         "additionalTags": [
                             "x64",
                             "Qt"
                         ],
                         "downloadCount": 0,
-                        "size": 26622584
+                        "size": 26584616
                     }
                 ],
                 "MacOS": [
                     {
-                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.4/pcsx2x6-v0.2.4-macos-Qt.tar.xz",
-                        "displayName": "pcsx2x6-v0.2.4-macos-Qt.tar.xz",
+                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.5/pcsx2x6-v0.2.5-macos-Qt.tar.xz",
+                        "displayName": "pcsx2x6-v0.2.5-macos-Qt.tar.xz",
                         "additionalTags": [
                             "Qt"
                         ],
                         "downloadCount": 0,
-                        "size": 22539500
+                        "size": 22539464
                     }
                 ],
                 "Windows": [
                     {
-                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.4/pcsx2x6-v0.2.4-windows-x64-Qt-symbols.7z",
-                        "displayName": "pcsx2x6-v0.2.4-windows-x64-Qt-symbols.7z",
+                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.5/pcsx2x6-v0.2.5-windows-x64-Qt-symbols.7z",
+                        "displayName": "pcsx2x6-v0.2.5-windows-x64-Qt-symbols.7z",
                         "additionalTags": [
                             "x64",
                             "Qt",
                             "symbols"
                         ],
                         "downloadCount": 0,
-                        "size": 21095638
+                        "size": 21098349
                     },
                     {
-                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.4/pcsx2x6-v0.2.4-windows-x64-Qt.7z",
-                        "displayName": "pcsx2x6-v0.2.4-windows-x64-Qt.7z",
+                        "url": "https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.5/pcsx2x6-v0.2.5-windows-x64-Qt.7z",
+                        "displayName": "pcsx2x6-v0.2.5-windows-x64-Qt.7z",
                         "additionalTags": [
                             "x64",
                             "Qt"
                         ],
                         "downloadCount": 0,
-                        "size": 24045117
+                        "size": 24043224
                     }
                 ]
             },
             "type": 2,
             "prerelease": true,
-            "createdAt": "2026-07-18T18:08:01Z",
-            "publishedAt": "2026-07-18T18:34:09Z"
+            "createdAt": "2026-07-18T18:33:52Z",
+            "publishedAt": "2026-07-18T18:50:45Z"
         }
     ],
     "pageInfo": {
