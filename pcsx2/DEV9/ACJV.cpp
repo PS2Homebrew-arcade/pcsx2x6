@@ -419,6 +419,7 @@ static const std::map<std::string, StandardLayout> s_standard_layouts = {
 	{"NM00006", StandardLayout::SMASHCOURT},  // Smash Court Pro Tournament
 	{"NM10003", StandardLayout::TECHNICBEAT}, // Technic Beat (unique unofficial gameid; NM00003 = Vampire Night, GameIndex PR #92)
 	{"NM00030", StandardLayout::GUNDAMQUIZ},  // Gundam Quiz Warrior (moved from Fighting: a quiz, not a fighter)
+	{"NM00037", StandardLayout::INUFUKU},     // Quiz Suku Suku Inufuku 2
 };
 
 // Drum (Taiko) and twin-stick (Zoids) gameids for ResolveModeFromGameId (no per-button table).
@@ -480,6 +481,7 @@ std::span<const InputBindingInfo> ACJV::GetStandardButtons()
 		case StandardLayout::SMASHCOURT:  return s_standard_smashcourt;
 		case StandardLayout::TECHNICBEAT: return s_standard_technicbeat;
 		case StandardLayout::GUNDAMQUIZ:  return s_standard_gundamquiz;
+		case StandardLayout::INUFUKU:     return s_standard_inufuku;
 	}
 	return {};
 }
