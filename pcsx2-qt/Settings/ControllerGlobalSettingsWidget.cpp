@@ -52,6 +52,7 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 #ifdef _WIN32
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableXInputSource, "InputSources", "XInput", false);
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableDInputSource, "InputSources", "DInput", false);
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableRawInputSource, "InputSources", "RawInput", false);
 #else
 	m_ui.mainLayout->removeWidget(m_ui.xinputGroup);
 	m_ui.xinputGroup->deleteLater();
@@ -59,6 +60,9 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 	m_ui.mainLayout->removeWidget(m_ui.dinputGroup);
 	m_ui.dinputGroup->deleteLater();
 	m_ui.dinputGroup = nullptr;
+	m_ui.mainLayout->removeWidget(m_ui.rawinputGroup);
+	m_ui.rawinputGroup->deleteLater();
+	m_ui.rawinputGroup = nullptr;
 #endif
 
 	if (dialog->isEditingProfile())
@@ -84,6 +88,11 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 }
 
 ControllerGlobalSettingsWidget::~ControllerGlobalSettingsWidget() = default;
+
+void ControllerGlobalSettingsWidget::clearDeviceList()
+{
+	m_ui.deviceList->clear();
+}
 
 void ControllerGlobalSettingsWidget::addDeviceToList(const QString& identifier, const QString& name)
 {

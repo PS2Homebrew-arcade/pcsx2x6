@@ -27,6 +27,7 @@ enum class InputSourceType : u32
 #ifdef _WIN32
 	DInput,
 	XInput,
+	RawInput,
 #endif
 	Count,
 };
@@ -166,12 +167,12 @@ namespace InputManager
 	static constexpr double VIBRATION_UPDATE_INTERVAL_SECONDS = 0.5; // 500ms
 
 	/// Maximum number of host mouse devices.
-	static constexpr u32 MAX_POINTER_DEVICES = 1;
+	static constexpr u32 MAX_POINTER_DEVICES = 8;
 	static constexpr u32 MAX_POINTER_BUTTONS = 3;
 
-	/// Maximum number of software cursors. We allocate an extra two for USB devices with
-	/// positioning data from the controller instead of a mouse.
-	static constexpr u32 MAX_SOFTWARE_CURSORS = MAX_POINTER_BUTTONS + 2;
+	/// Maximum number of software cursors: one per pointer device, plus the relative-aim
+	/// slots (GunCon2 uses MAX_POINTER_DEVICES + port).
+	static constexpr u32 MAX_SOFTWARE_CURSORS = MAX_POINTER_DEVICES * 2;
 
 	/// Returns a pointer to the external input source class, if present.
 	InputSource* GetInputSourceInterface(InputSourceType type);
@@ -294,6 +295,15 @@ namespace InputManager
 	/// Zeros all vibration intensities. Call when pausing.
 	/// The pad vibration state will internally remain, so that when emulation is unpaused, the effect resumes.
 	void PauseVibration();
+
+	/// Returns true if the RawInput source is active (Windows multi-mouse).
+	bool IsUsingRawInput();
+
+	/// Returns the pointer index assigned to a raw device, or nullopt.
+	std::optional<u32> GetPointerIndexForRawDevice(const std::string_view device_path);
+
+	/// Returns raw pointer devices as (identity, display_name) pairs.
+	std::vector<std::pair<std::string, std::string>> EnumerateRawPointerDevices();
 
 	/// Reads absolute pointer position.
 	std::pair<float, float> GetPointerAbsolutePosition(u32 index);

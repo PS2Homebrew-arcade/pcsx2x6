@@ -72,6 +72,35 @@
      </layout>
     </widget>
    </item>
+   <item row="2" column="0">
+    <widget class="QGroupBox" name="rawinputGroup">
+     <property name="title">
+      <string>Raw Input Source</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_rawinput">
+      <item row="0" column="0" colspan="2">
+       <widget class="QLabel" name="label_rawinput">
+        <property name="text">
+         <string>The Raw Input source enables per-device tracking for absolute positioning devices (e.g.: light guns). When enabled, each device is tracked independently, allowing multi-player support with separate input per port.</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+        <property name="textInteractionFlags">
+         <set>Qt::TextBrowserInteraction</set>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="enableRawInputSource">
+        <property name="text">
+         <string>Enable Raw Input Source</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="3" column="0">
     <widget class="QGroupBox" name="dinputGroup">
      <property name="title">
@@ -312,6 +341,7 @@
   <tabstop>enableSDLMFIDriver</tabstop>
   <tabstop>enableXInputSource</tabstop>
   <tabstop>enableDInputSource</tabstop>
+  <tabstop>enableRawInputSource</tabstop>
   <tabstop>enableMouseMapping</tabstop>
   <tabstop>mouseSettings</tabstop>
   <tabstop>multitapPort1</tabstop>

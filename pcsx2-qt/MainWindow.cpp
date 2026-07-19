@@ -61,6 +61,8 @@
 
 #ifdef _WIN32
 #include "common/RedtapeWindows.h"
+#include "pcsx2/Input/InputSource.h"
+#include "pcsx2/Input/RawInputSource.h"
 #include <Dbt.h>
 #endif
 
@@ -2496,6 +2498,18 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
 				if (GetRawInputData((HRAWINPUT)msg->lParam, RID_INPUT, lpb.data(), &dwSize, sizeof(RAWINPUTHEADER)) == dwSize)
 				{
 					const RAWINPUT* raw = reinterpret_cast<const RAWINPUT*>(lpb.data());
+
+					// dispatch to RawInputSource for per-device tracking
+					InputSource* raw_source = InputManager::GetInputSourceInterface(InputSourceType::RawInput);
+					if (raw_source && raw_source->IsInitialized())
+					{
+						HWND render_hwnd = m_display_surface ?
+							reinterpret_cast<HWND>(m_display_surface->winId()) : static_cast<HWND>(nullptr);
+						pxAssertMsg(dynamic_cast<RawInputSource*>(raw_source), "Expected RawInputSource");
+						static_cast<RawInputSource*>(raw_source)->ProcessRawInput(raw, render_hwnd);
+					}
+
+					// system-cursor lock/clamp, always active
 					if (raw->header.dwType == RIM_TYPEMOUSE)
 					{
 						const RAWMOUSE& mouse = raw->data.mouse;

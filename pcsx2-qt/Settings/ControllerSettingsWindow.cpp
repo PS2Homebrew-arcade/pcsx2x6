@@ -278,6 +278,7 @@ void ControllerSettingsWindow::onRestoreDefaultsClicked()
 void ControllerSettingsWindow::onInputDevicesEnumerated(const QList<QPair<QString, QString>>& devices)
 {
 	m_device_list = devices;
+	m_global_settings->clearDeviceList(); // full enumeration replaces the list, it doesn't stack on it
 	for (const QPair<QString, QString>& device : devices)
 		m_global_settings->addDeviceToList(device.first, device.second);
 }

@@ -14,6 +14,7 @@ class ControllerSettingsWindow;
 class QShowEvent;
 class QComboBox;
 class QVBoxLayout;
+class QLabel;
 struct InputBindingInfo;
 
 class JVSControlsWidget final : public QWidget
@@ -48,4 +49,5 @@ private:
 	std::string m_autoPickedGameId;
 	QComboBox* m_aimCombos[2] = {}; // [0] = USB1/P1, [1] = USB2/P2
 	QComboBox* m_touchAimCombo = nullptr;
+	QLabel* m_rawInputStatus = nullptr;
 };
