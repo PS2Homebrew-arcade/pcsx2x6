@@ -883,6 +883,8 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
 
+	ACJV::SetGunOffscreenContour(si.GetFloatValue(ACJV::CONFIG_SECTION, "GunOffscreenContour", 1.0f) / 100.0f);
+
 	const std::span<const InputBindingInfo> player_bindings[] = {
 		ACJV::GetButtonBindings(),
 		ACJV::GetP2ButtonBindings(),
