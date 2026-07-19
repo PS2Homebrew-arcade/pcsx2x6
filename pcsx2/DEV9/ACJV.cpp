@@ -371,14 +371,14 @@ static float m_wheelGas    = 0.0f; // right trigger (R2)
 static float m_wheelBrake  = 0.0f; // left trigger  (L2)
 
 // Per-game JVS button mapping for lightgun games, keyed by NM game ID (see issue #9).
-// Field order: pedal, sensor, sensor_active_high, p1_start, p2_start, p1_trigger, p2_trigger
-// Each value is a JVS bit from JVSButton enum. 0 = not used for this game.
-static const GunMapping s_default_gun_mapping = {JVS_BTN_3, JVS_BTN_RIGHT, false, 0, 0, JVS_BTN_2, 0};
+// Field order: pedal, sensor, sensor_active_high, p1_start, p2_start, p1_trigger, p2_trigger, board
+// Each button value is a JVS bit from JVSButton enum. 0 = not used for this game.
+static const GunMapping s_default_gun_mapping = {JVS_BTN_3, JVS_BTN_RIGHT, false, 0, 0, JVS_BTN_2, 0, GunBoardModel::Classic};
 static const std::map<std::string, GunMapping> s_gun_mappings = {
-	{"NM00003", {0,            0x200,         true,  JVS_BTN_3,  JVS_BTN_6, JVS_BTN_2,    JVS_BTN_5}}, // Vampire Night
-	{"NM00012", {JVS_BTN_6,    0,             false, 0,          0,          JVS_BTN_2,    0}},          // Time Crisis 3
-	{"NM00021", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0}},          // Cobra The Arcade
-	{"NM00032", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0}},          // Time Crisis 4
+	{"NM00003", {0,            0x200,         true,  JVS_BTN_3,  JVS_BTN_6, JVS_BTN_2,    JVS_BTN_5, GunBoardModel::CameraVN}},      // Vampire Night
+	{"NM00012", {JVS_BTN_6,    0,             false, 0,          0,          JVS_BTN_2,    0,         GunBoardModel::TwoTierTC3}},     // Time Crisis 3
+	{"NM00021", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0,         GunBoardModel::Classic}},       // Cobra The Arcade
+	{"NM00032", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0,         GunBoardModel::SideSwitchTC4}}, // Time Crisis 4
 };
 static const GunMapping* m_gunMapping = &s_default_gun_mapping;
 
@@ -678,6 +678,20 @@ void ACJV::SetGunRelativeAim(u32 player, float dx, float dy)
 	if (player < JVS_PLAYER_COUNT) { s_gunRelativeDX[player] = dx; s_gunRelativeDY[player] = dy; }
 }
 
+// Namco camera-gun geometry, measured in the VPNGAME binary (GunMgrClass::adjustVal_cz):
+// the visible picture spans +-230x+-140 of a +-320x+-224 acceptance window, so the picture
+// maps to the middle 71.875%/62.5% of the reported range. The ring around it is the
+// aim-beside-the-screen area, and the board reports 0xFFFF/0xFFFF when the camera loses
+// the screen entirely.
+static constexpr float GUN_CAM_VISIBLE_X = 230.0f / 320.0f;
+static constexpr float GUN_CAM_VISIBLE_Y = 140.0f / 224.0f;
+static u16 s_gunRawX[JVS_PLAYER_COUNT] = {0xFFFF, 0xFFFF};
+static u16 s_gunRawY[JVS_PLAYER_COUNT] = {0xFFFF, 0xFFFF};
+static bool s_gunForceOff = false;
+void ACJV::SetGunForceOffscreen(bool held) { s_gunForceOff = held; }
+static float s_gunContour = 0.01f;
+void ACJV::SetGunOffscreenContour(float fraction) { s_gunContour = std::clamp(fraction, 0.0f, 0.05f); }
+
 static void UpdateLightgunFromMouse()
 {
 	float mdx, mdy;
@@ -686,10 +700,70 @@ static void UpdateLightgunFromMouse()
 
 	constexpr float edge_margin = 0.01f;
 	const auto& gm = ACJV::GetGunMapping();
+	const bool camera = (gm.board == GunBoardModel::CameraVN);
+	const bool side_switch = (gm.board == GunBoardModel::SideSwitchTC4);
+	const bool two_tier = (gm.board == GunBoardModel::TwoTierTC3);
+	const bool unclamped = camera || side_switch || two_tier;
+	float udx = -1.0f, udy = -1.0f;
+	if (unclamped)
+		GSTranslateWindowToDisplayCoordinatesUnclamped(mx, my, &udx, &udy);
 	for (u32 p = 0; p < JVS_PLAYER_COUNT; p++)
 	{
-		const float dx = s_gunAimJoystick[p] ? s_gunRelativeDX[p] : mdx;
-		const float dy = s_gunAimJoystick[p] ? s_gunRelativeDY[p] : mdy;
+		const float dx = s_gunAimJoystick[p] ? s_gunRelativeDX[p] : (unclamped ? udx : mdx);
+		const float dy = s_gunAimJoystick[p] ? s_gunRelativeDY[p] : (unclamped ? udy : mdy);
+		if (camera)
+		{
+			const float fx = 0.5f + (dx - 0.5f) * GUN_CAM_VISIBLE_X;
+			const float fy = 0.5f + (0.5f - dy) * GUN_CAM_VISIBLE_Y; //reported Y is bottom-up
+			// Workaround for the PCSX2 pointer limitation: the outer band of the picture counts as
+			// aiming beside the screen, so the native reload (invalid position -> reloadExe) stays reachable.
+			const float contour = s_gunContour;
+			const bool in_aim_area = (dx >= contour && dx <= 1.0f - contour && dy >= contour && dy <= 1.0f - contour);
+			const bool lost = s_gunForceOff || !in_aim_area || (fx < 0.0f || fx > 1.0f || fy < 0.0f || fy > 1.0f);
+			s_gunRawX[p] = lost ? 0xFFFF : static_cast<u16>(std::clamp(fx * 65535.0f, 1.0f, 65534.0f));
+			s_gunRawY[p] = lost ? 0xFFFF : static_cast<u16>(std::clamp(fy * 65535.0f, 1.0f, 65534.0f));
+			if (s_gunRawX[p] == 0x7FFF) s_gunRawX[p] = 0x7FFE; //0x7FFF is skipped by the game's adjust sampler
+			if (s_gunRawY[p] == 0x7FFF) s_gunRawY[p] = 0x7FFE;
+			if (gm.sensor) //the camera still sees the screen from the overscan ring
+				ACJV::SetButtonState(p, gm.sensor, gm.sensor_active_high ? !lost : lost);
+			continue;
+		}
+		if (two_tier)
+		{
+			// TC3's two offscreen tiers (TC3LOAD FUN_0019c800): a coord past [0,640]x[0,448] = yellow
+			// reload, the 0xFFFF/0xFFFF sentinel = red gun-lost.
+			const float overshoot = std::max({0.0f, -dx, dx - 1.0f, -dy, dy - 1.0f});
+			constexpr float LOST = 0.35f; // empirical guess, not real value
+			if (overshoot > LOST)
+			{
+				s_gunRawX[p] = 0xFFFF;
+				s_gunRawY[p] = 0xFFFF;
+			}
+			else
+			{
+				const int px = static_cast<int>(std::lround(dx * 640.0f));
+				const int py = static_cast<int>(std::lround((1.0f - dy) * 448.0f)); //reported Y is bottom-up, native 0..448
+				s_gunRawX[p] = static_cast<u16>(static_cast<s16>(std::clamp(px, -32767, 32767)));
+				s_gunRawY[p] = static_cast<u16>(static_cast<s16>(std::clamp(py, -32767, 32767)));
+			}
+			continue;
+		}
+		if (side_switch)
+		{
+			// TSS-I/O reports the gun position clamped to its field edge plus a separate offscreen
+			// flag; it never zeroes the coordinate (verified in TC4LOAD's JVS parse), so aiming past
+			// a side still tells the game which way to switch screens.
+			const float cx = std::clamp(dx, 0.0f, 1.0f);
+			const float cy = std::clamp(dy, 0.0f, 1.0f);
+			const bool inside = (dx >= 0.0f && dy >= 0.0f && dx <= 1.0f && dy <= 1.0f);
+			m_jvsScreenPosX[p] = static_cast<u16>((1.0f - cx) * 0xFFFF);
+			m_jvsScreenPosY[p] = static_cast<u16>(cy * 0xFFFF);
+			m_jvsLightgunDX[p] = inside ? dx : -1.0f;
+			m_jvsLightgunDY[p] = inside ? dy : -1.0f;
+			if (gm.sensor)
+				ACJV::SetButtonState(p, gm.sensor, gm.sensor_active_high ? inside : !inside);
+			continue;
+		}
 		const bool on_screen = (dx >= 0.0f && dy >= 0.0f && dx < (1.0f - edge_margin) && dy < (1.0f - edge_margin));
 		if (on_screen)
 		{
@@ -1106,10 +1180,16 @@ void do_jvs_packet(const u8* input, u8* output) {
 			// frame), so return that one gun's player position - gun 1 -> P1, gun 2 -> P2.
 			const u32 pl = (channel >= 1 && channel <= JVS_PLAYER_COUNT) ? (channel - 1u) : 0u;
 			u16 posX = 0, posY = 0;
+			const GunBoardModel board = ACJV::GetGunMapping().board;
 			if(m_jvsMode == JVS_MODE::TOUCH)
 			{
 				posX = m_jvsScreenPosX[0];
 				posY = m_jvsScreenPosY[0];
+			}
+			else if(m_jvsMode == JVS_MODE::LIGHTGUN && (board == GunBoardModel::CameraVN || board == GunBoardModel::TwoTierTC3))
+			{ //values built straight in UpdateLightgunFromMouse (0xFFFF/0xFFFF = camera lost / fully off)
+				posX = s_gunRawX[pl];
+				posY = s_gunRawY[pl];
 			}
 			else if(m_jvsMode == JVS_MODE::LIGHTGUN && m_jvsLightgunDX[pl] >= 0.0f)
 			{
@@ -1159,9 +1239,10 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*dstSize) += 1;
 		}
 		break;
-		// Namco vendor command: a sub-command byte plus its args (0x60 status = 1 arg, 0x62 touch
-		// initialize = 2 args, 0x18 boot config = 4 args). We echo the sub-command and report 0x01,
-		// which is the "ready" the game waits on to finish INITIALIZE.
+		// Namco vendor command 0x70. Two dialects share it: the FCB touch panel sends a sub-command
+		// plus args (0x60 status = 1, 0x62 touch init = 2, 0x18 boot config = 4) and waits on an echo
+		// with report 0x01; the Sys246gun camera board (VN) sends adjust-control sub 0x40 and its
+		// n246JvioNamcoGun* parsers expect report, 0xFF marker, length, then payload[2] = 1 (complete).
 		case JVS::NAMCO_VENDOR:
 		{
 			JVS_ASSERT(inSize != 0);
@@ -1169,19 +1250,38 @@ void do_jvs_packet(const u8* input, u8* output) {
 			inWorkChecksum += sub;
 			inSize--;
 
-			u8 args = (sub == 0x60) ? 1 : (sub == 0x62) ? 2 : (sub == 0x18) ? 4 : inSize;
-			for(u8 i = 0; i < args && inSize != 0; i++)
+			if (ACJV::GetGunMapping().board == GunBoardModel::CameraVN)
 			{
-				u8 data = (*input++);
-				inWorkChecksum += data;
-				inSize--;
+				while (inSize != 0)
+				{
+					u8 data = (*input++);
+					inWorkChecksum += data;
+					inSize--;
+				}
+				(*output++) = JVS_CMD_SUCCESS;
+				(*output++) = 0xFF;
+				(*output++) = 0x04; //payload length
+				(*output++) = sub;
+				(*output++) = 0x00;
+				(*output++) = 0x01; //payload[2]: adjust complete (the real board reports busy first; ours finishes instantly)
+				(*output++) = 0x00;
+				(*dstSize) += 7;
 			}
-
-			(*output++) = JVS_CMD_SUCCESS;
-			(*output++) = 0x02; //payload length
-			(*output++) = sub;  //sub-command echo
-			(*output++) = 0x01; //status: ready
-			(*dstSize) += 4;
+			else
+			{
+				u8 args = (sub == 0x60) ? 1 : (sub == 0x62) ? 2 : (sub == 0x18) ? 4 : inSize;
+				for(u8 i = 0; i < args && inSize != 0; i++)
+				{
+					u8 data = (*input++);
+					inWorkChecksum += data;
+					inSize--;
+				}
+				(*output++) = JVS_CMD_SUCCESS;
+				(*output++) = 0x02; //payload length
+				(*output++) = sub;  //sub-command echo
+				(*output++) = 0x01; //status: ready
+				(*dstSize) += 4;
+			}
 		}
 		break;
 		default:

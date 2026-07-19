@@ -79,6 +79,13 @@ enum class StandardLayout {
 #define JVS_WHEEL_CHANNEL_MAX 3
 #define JVS_DRUM_CHANNEL_MAX 8
 
+enum class GunBoardModel : u8 {
+    Classic,        // (0,0) when off-screen, sensor bit only
+    CameraVN,       // Sys246gun camera (VN): 0xFFFF/0xFFFF = camera lost, 5-point calibration frame
+    SideSwitchTC4,  // TSS-I/O (TC4): coords clamp to the field edge (never zeroed), off-screen flag separate
+    TwoTierTC3,     // TSS-I/O (TC3): coord past [0,640]x[0,448] = yellow reload; 0xFFFF/0xFFFF = red fully-lost
+};
+
 struct GunMapping {
     u16 pedal;
     u16 sensor;
@@ -87,6 +94,7 @@ struct GunMapping {
     u16 p2_start;
     u16 p1_trigger;
     u16 p2_trigger;
+    GunBoardModel board;
 };
 
 namespace ACJV {
@@ -172,6 +180,8 @@ namespace ACJV {
     void SetScreenPos(u16 x, u16 y);
     void SetGunAimSource(u32 player, bool joystick);        // lightgun aim source: false = shared mouse, true = player's stick
     void SetGunRelativeAim(u32 player, float dx, float dy); // player's stick-driven screen position from the GunCon2 (display coords)
+    void SetGunForceOffscreen(bool held);                   // force the camera-lost report (the pedal bind = manual reload on Vampire Night)
+    void SetGunOffscreenContour(float fraction);            // width of the aim-beside-the-screen band at the window edge (0..0.05)
     void SetGameId(const std::string& gameid);
     const std::string& GetGameId();
     const GunMapping& GetGunMapping();

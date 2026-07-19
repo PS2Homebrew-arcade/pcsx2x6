@@ -503,7 +503,7 @@ namespace usb_lightgun
 	{
 		const auto& [wx, wy] = s->GetAbsolutePositionFromRelativeAxes();
 		float dx, dy;
-		GSTranslateWindowToDisplayCoordinates(wx, wy, &dx, &dy);
+		GSTranslateWindowToDisplayCoordinatesUnclamped(wx, wy, &dx, &dy);
 		ACJV::SetGunRelativeAim(s->port, dx, dy);
 	}
 
@@ -633,8 +633,14 @@ namespace usb_lightgun
 						ACJV::SetButtonState(player, mapping.p1_trigger, pressed);
 					break;
 				}
-				// Foot pedal (cover/reload system: TC3, TC4, Cobra)
-				case BID_A:       ACJV::SetButtonState(player, ACJV::GetGunMapping().pedal, pressed); break;
+				// Foot pedal (cover/reload system: TC3, TC4, Cobra). Vampire Night has no pedal
+				// switch, so there the bind forces the camera-lost report = a manual reload.
+				case BID_A:
+					if (ACJV::GetGunMapping().board == GunBoardModel::CameraVN)
+						ACJV::SetGunForceOffscreen(pressed);
+					else
+						ACJV::SetButtonState(player, ACJV::GetGunMapping().pedal, pressed);
+					break;
 				// Start: P1 uses p1_start, P2 uses p2_start if defined (Vampire Night 2P)
 				case BID_START:
 				{
