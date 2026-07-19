@@ -10,6 +10,8 @@
 #include "ACATA.h"
 #include "ACATA_IO_CHD.h"
 
+#include <cstring>
+
 #if __POSIX__
 #define INVALID_HANDLE_VALUE -1
 #include <unistd.h>
@@ -17,6 +19,7 @@
 #endif
 
 std::mutex ACATA::TH::ioMutex;
+std::string ACATA::TH::open_error;
 bool ACATA::TH::b_isIdle,
     ACATA::TH::ioWrite,
     ACATA::TH::ioRead,
@@ -25,6 +28,8 @@ std::condition_variable ACATA::TH::Idle_cv, ACATA::TH::ioReady;
 FILE* ACATA::TH::IMAGE;
 s64 ACATA::TH::IMAGESIZE;
 u32 ACATA::TH::sectorsize = ACATAPI::CONSTANTS::DVD_SECTORSIZE; //TODO: remove hardcode before testing HDD/CD games !
+u32 ACATA::TH::unitbytes;
+u32 ACATA::TH::unitdataoff;
 u32 ACATA::TH::nsector;
 s64 ACATA::TH::LBA;
 
@@ -87,8 +92,65 @@ void ACATA::TH::IO_Write(u32* addr, u32 size) {
 	} else Console.ErrorFmt("{}: skipping write due to CHD media", __FUNCTION__);
 }
 
+static bool probe_at(FILE* f, s64 pos, u8* dst, u32 len) {
+	if (FileSystem::FSeek64(f, pos, SEEK_SET) != 0)
+		return false;
+	return std::fread(dst, 1, len, f) == len;
+}
+
+static bool pvd_at(FILE* f, s64 pos) { //ISO9660 primary volume descriptor magic
+	u8 b[6];
+	return probe_at(f, pos, b, 6) && std::memcmp(b, "\x01" "CD001", 6) == 0;
+}
+
+static const u8 CD_SYNC[12] = {0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00};
+
+static void apply_disc_layout(u32 stride, u32 dataoff) { //IMAGESIZE becomes logical bytes, like the CHD branch
+	ACATA::TH::unitbytes = stride;
+	ACATA::TH::unitdataoff = dataoff;
+	ACATA::TH::IMAGESIZE = (ACATA::TH::IMAGESIZE / stride) * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
+	Console.WriteLnFmt("ACATA: disc image has {}-byte sector units, payload at +{}", stride, dataoff);
+}
+
+// Find where the 2048-byte payload sits in a CD/DVD image; false = corrupted dump.
+static bool DetectDiscImageLayout() {
+	FILE* f = ACATA::TH::IMAGE;
+	u8 hdr[16];
+	if (!probe_at(f, 0, hdr, 16))
+		return true;
+	if (std::memcmp(hdr, CD_SYNC, 12) == 0) { //raw CD frames; MODE2 has an 8-byte subheader before the payload
+		for (u32 stride : {2352u, 2448u}) {
+			u8 next_sync[12];
+			if (probe_at(f, stride, next_sync, 12) && std::memcmp(next_sync, CD_SYNC, 12) == 0) {
+				apply_disc_layout(stride, (hdr[15] == 2) ? 24 : 16);
+				return true;
+			}
+		}
+	}
+	if (pvd_at(f, 16 * 2048)) //plain cooked 2048 iso: the default path already fits
+		return true;
+	if ((ACATA::TH::IMAGESIZE % 2336) == 0 && pvd_at(f, 16 * 2336 + 8)) { //2336 Mode2 CD dump: subheader kept
+		apply_disc_layout(2336, 8);
+		return true;
+	}
+	if ((ACATA::TH::IMAGESIZE % 2064) == 0 && pvd_at(f, 16 * 2064 + 12)) { //raw DVD sectors: 12-byte ID/IED/CPR header
+		apply_disc_layout(2064, 12);
+		return true;
+	}
+	if (pvd_at(f, 16 * 2048 + 8)) {
+		ACATA::TH::open_error = "This disc image is a corrupted dump (truncated sectors). A clean dump of this disc is required.";
+		Console.Error("ACATA: this disc image is a corrupted dump (truncated sectors), a clean dump of this disc is required.");
+		return false;
+	}
+	Console.Warning("ACATA: unknown disc image layout, assuming plain 2048-byte sectors");
+	return true;
+}
+
 int ACATA::TH::IO_OpenImage() {
+	open_error.clear();
 	isCHD = ChdImage::IsChdFileName(ACATA::imgpath);
+	unitbytes = 0;
+	unitdataoff = 0;
 	if (isCHD) {
 		if (CHD.Open(ACATA::imgpath)) {
 			u32 secsize = CHD.GetSectorSize();
@@ -114,6 +176,11 @@ int ACATA::TH::IO_OpenImage() {
 		else {
 			Console.ErrorFmt("{}> fail to get filesize: {}", __FUNCTION__, t);
 			return EINVAL;
+		}
+		if ((ACATA::MediaType == ACMEDIATYPE::ACCD || ACATA::MediaType == ACMEDIATYPE::ACDVD) && !DetectDiscImageLayout()) {
+			std::fclose(ACATA::TH::IMAGE);
+			ACATA::TH::IMAGE = nullptr;
+			return EIO;
 		}
 		Console.WriteLn("%s: image opened ok", __FUNCTION__);
 	}

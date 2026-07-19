@@ -86,6 +86,9 @@ namespace ACATA
         extern FILE* IMAGE;
         extern s64 IMAGESIZE;
         extern u32 sectorsize; //512 for hdd and 2048 for Disc (?) check it
+        extern u32 unitbytes;   //bytes per sector unit in a raw disc image file (0 = plain 2048-byte units)
+        extern u32 unitdataoff; //offset of the 2048-byte payload inside a unit
+        extern std::string open_error; //user-facing reason when IO_OpenImage rejects the image
         extern u32 nsector;
         extern s64 LBA;
 
