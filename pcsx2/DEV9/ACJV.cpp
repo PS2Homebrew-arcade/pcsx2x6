@@ -269,6 +269,15 @@ void ACJV::LoadConfig(const SettingsInterface& si)
 	s_outputs_enabled = si.GetBoolValue(CONFIG_SECTION, "OutputsEnabled", false);
 }
 
+void ACJV::Shutdown() 
+{
+	if (Outputs)
+	{
+		delete Outputs;
+		Outputs = nullptr;
+	}
+}
+
 void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface& src_si, bool copy_settings, bool copy_bindings)
 {
 	if (copy_settings)
@@ -1267,7 +1276,7 @@ void ACJV::threadMemoryOutputs()
 {
 	Console.WriteLn("OUTPUTS: ACJV Recoil Thread Start");
 
-	while (s_gameid != "")
+	while (s_gameid != "" && Outputs)
 	{
 		if (VMManager::GetState() == VMState::Running)
 		{

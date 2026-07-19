@@ -1941,6 +1941,8 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	DEV9shutdown();
 
+	ACJV::Shutdown();
+
 	if (GSDumpReplayer::IsReplayingDump())
 		GSDumpReplayer::Shutdown();
 	else {
