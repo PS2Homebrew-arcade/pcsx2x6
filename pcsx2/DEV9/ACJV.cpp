@@ -1316,7 +1316,7 @@ void do_acjv_packet() {
 		rd16[1]      = JvFirmwareVersion();
 		rd16[0x14]   = RootPacketID; // Xored with value at 0x10 in send packet, needs to be the same
 		rd16[0x21]   = wr16[0x0D];
-		rd16[0x30]  = s_dip_switch_state; // here the game polls the dip switch values?
+		rdbuf[0x30]  = s_dip_switch_state; // here the game polls the dip switch values?
 		static u8 s_acFrameSeq = 0;
 		rdbuf[0x57] = ++s_acFrameSeq; // game waits on this byte advancing each frame to finalize a coin decrement
 		u16 PacketID = wr16[0x0C];
