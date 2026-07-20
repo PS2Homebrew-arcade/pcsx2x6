@@ -1353,22 +1353,8 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				return false;
 			} else {
 				Console.WriteLn(Color_Green, "# ARCADE GAME CONFIG FILE DETECTED");
-				std::string basedir = Path::ToNativePath(Path::GetDirectory(filename))+FS_OSPATH_SEPARATOR_CHARACTER;
-				std::string subdir = INI.GetStringValue("data", "subdir");
-				if (subdir != "") basedir = Path::AppendDirectory(basedir, subdir);
-				Console.WriteLnFmt(Color_Green, "ACGAME: basedir:'{}'", basedir);
 				std::string s_acmedia, s_imgname, s_serial;
-				s_acmedia = INI.GetStringValue("data", "media");
-				s_imgname = INI.GetStringValue("data", "mediasrc");
-				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
-				if (!ArcadeiLinkID.empty() &&
-					(ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN")) {
-					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
-					return false;
-				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
-				s_title = s_serial = INI.GetStringValue("game", "name");
-				s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
-				s_acgame_serial = s_serial;
+				s_acgame_serial = s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
 				bool idvalid = (s_serial.length() == 7 && (s_serial[0] == 'N' && s_serial[1] == 'M'));
     			for (int i = 2; idvalid && i < 7; i++)
     			    idvalid = (s_serial[i] >= '0' && s_serial[i] <= '9');
@@ -1377,18 +1363,29 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 					return false;
 				}
 
-				ACJV::SetGameId(s_serial); // Adapt JVS input to detected GAMEID
-				std::string platform = INI.GetStringValue("game", "platform", "");
+				std::string basedir = Path::ToNativePath(Path::GetDirectory(filename))+FS_OSPATH_SEPARATOR_CHARACTER;
+				std::string subdir = INI.GetStringValue("data", "subdir", s_serial.c_str());
+				if (subdir != "") basedir = Path::AppendDirectory(basedir, subdir);
+				Console.WriteLnFmt(Color_Green, "ACGAME: basedir:'{}'", basedir);
+
+
+				s_acmedia = INI.GetStringValue("data", "media");
+				s_imgname = INI.GetStringValue("data", "mediasrc", fmt::format("{}.chd", s_serial).c_str());
+				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
+				if (!ArcadeiLinkID.empty() &&
+					(ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN")) {
+					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
+					return false;
+				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
+				s_title = INI.GetStringValue("game", "name");
+
+				ACJV::SetGameId(s_title); // Adapt JVS input to detected GAMEID
+				std::string platform = INI.GetStringValue("game", "platform", "246");
 				s_acgame_sys246 = (platform == "246" || platform == "256" || platform == "super256");
 				s_acgame_sys256 = (platform == "256" || platform == "super256");
-				if (platform == "super256")
-					PS2CLK = PS2CLK_SS256;
-				else if (s_acgame_sys256)
-					PS2CLK = PS2CLK_S256;
-				if (s_acgame_sys256)
-				{
+				PS2CLK = (platform == "super256") ? PS2CLK_SS256 : ((platform == "256") ? PS2CLK_S256 : PS2CLK_DEFAULT);
+				if (PS2CLK != PS2CLK_DEFAULT)
 					Console.WriteLnFmt(Color_Green, "ACGAME: System {} requested — overclock will be applied", platform);
-				}
 
 				// When subdir= is set, basedir points to the subdir (e.g. roms/tekken4/).
 				// Dongle/card files may live elsewhere, so fall back to acgame dir and memcards/.
@@ -1396,27 +1393,23 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string card;
 				// Slot 1 (mc0:) = dongle (boot modules only, no save data).
 				// Always overwrite — DONGLEMAN corrupts this file at runtime.
-				if ((card = INI.GetStringValue("data", "dongle", "")) != "") {
-					std::string src = Path::Combine(basedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(acgamedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(Path::Combine(acgamedir, "memcards"), card);
-					std::string dst = Path::Combine(EmuFolders::MemoryCards, card);
-					if (FileSystem::FileExists(src.c_str()))
-						FileSystem::CopyFilePath(src.c_str(), dst.c_str(), true);
+				if ((card = INI.GetStringValue("data", "dongle", fmt::format("{}.ps2", s_serial).c_str())) != "") {
+					std::string src = Path::Combine(EmuFolders::MemoryCards, card);
+					if (!FileSystem::FileExists(src.c_str())) {
+						Error::SetStringFmt(error, "requested dongle image does not exist! '{}'", card);
+						Console.ErrorFmt("ACGAME: cannot open a dongle file at location '{}'", src);
+						return false;
+					}
 					Host::SetBaseStringSettingValue("MemoryCards", "Slot1_Filename", card.c_str());
 				}
 				// Slot 2 (mc1:) = save card (e.g. SC2 conquest). Never overwrite existing saves.
 				if ((card = INI.GetStringValue("data", "card", "")) != "") {
-					std::string src = Path::Combine(basedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(acgamedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(Path::Combine(acgamedir, "memcards"), card);
-					std::string dst = Path::Combine(EmuFolders::MemoryCards, card);
-					if (FileSystem::FileExists(src.c_str()) && !FileSystem::FileExists(dst.c_str()))
-						FileSystem::CopyFilePath(src.c_str(), dst.c_str(), false);
+					std::string src = Path::Combine(EmuFolders::MemoryCards, card);
+					if (!FileSystem::FileExists(src.c_str())) {
+						Error::SetStringFmt(error, "requested memcard image does not exist! '{}'", card);
+						Console.ErrorFmt("ACGAME: cannot open a card file at location '{}'", src);
+						return false;
+					}
 					Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", card.c_str());
 				}
 				/// TODOx6: Decide if we want to lock mc1 access if .ACGAME does not ask for it
@@ -1454,7 +1447,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
 				int R;
 				if ((R = ACATA::TH::IO_OpenImage())!=0) {
-					Error::SetString(error, std::string("cannot open arcade media image"));
+					Error::SetStringFmt(error, "cannot open arcade media image {}", ACATA::imgpath);
 					return false;
 				}
 				if (s_acmedia == "CD" && !ACATA::imgpath.empty()) {
