@@ -674,7 +674,7 @@ static void populateAimCombo(QComboBox* combo, ControllerSettingsWindow* dialog,
 		if (dev.first == QLatin1String("Mouse") || dev.first == QLatin1String("Keyboard"))
 			continue;
 		// Raw mice are already listed above with their pointer slot.
-		if (dev.first.startsWith(QLatin1String("RawMouse-")))
+		if (dev.first.startsWith(QLatin1String("RawMouse-")) || dev.first.startsWith(QLatin1String("EvdevMouse-")))
 			continue;
 		combo->addItem(JVSControlsWidget::tr("%1 (Stick)").arg(dev.second), dev.first);
 	}
@@ -767,7 +767,7 @@ void JVSControlsWidget::buildLightgunPage()
 		g_emu_thread->enumerateInputDevices(); // queued after the re-scan; onInputDevicesEnumerated repopulates the combos
 	});
 	ag->addWidget(refreshBtn, 1, 3);
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
 	m_rawInputStatus = new QLabel(aimGroup);
 	ag->addWidget(m_rawInputStatus, 2, 0, 1, 4);
 #endif
@@ -950,9 +950,14 @@ void JVSControlsWidget::refreshAimDevices()
 	}
 	if (m_rawInputStatus)
 	{
+#ifdef _WIN32
+		const QString label = tr("Raw Input:");
+#else
+		const QString label = tr("Evdev:");
+#endif
 		m_rawInputStatus->setText(InputManager::IsUsingRawInput()
-			? QStringLiteral("%1 <b><span style='color:#2ecc71;'>ON</span></b>").arg(tr("Raw Input:"))
-			: QStringLiteral("%1 <b>OFF</b>").arg(tr("Raw Input:")));
+			? QStringLiteral("%1 <b><span style='color:#2ecc71;'>ON</span></b>").arg(label)
+			: QStringLiteral("%1 <b>OFF</b>").arg(label));
 	}
 }
 
