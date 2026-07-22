@@ -1349,6 +1349,9 @@
     <ClCompile Include="Input\XInputSource.cpp">
       <Filter>Misc\Input</Filter>
     </ClCompile>
+    <ClCompile Include="Input\RawInputSource.cpp">
+      <Filter>Misc\Input</Filter>
+    </ClCompile>
     <ClCompile Include="Host.cpp">
       <Filter>System</Filter>
     </ClCompile>
@@ -2311,6 +2314,9 @@
       <Filter>Misc\Input</Filter>
     </ClInclude>
     <ClInclude Include="Input\XInputSource.h">
+      <Filter>Misc\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\RawInputSource.h">
       <Filter>Misc\Input</Filter>
     </ClInclude>
     <ClInclude Include="Host.h">

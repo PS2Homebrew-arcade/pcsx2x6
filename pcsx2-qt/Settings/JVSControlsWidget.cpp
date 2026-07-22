@@ -653,18 +653,30 @@ static void populateAimCombo(QComboBox* combo, ControllerSettingsWindow* dialog,
 {
 	combo->blockSignals(true);
 	combo->clear();
-	for (u32 j = 0; j < InputManager::MAX_POINTER_DEVICES; j++)
+	// with RawInput, one entry per mouse; otherwise the single merged system pointer
+	const auto raw_mice = InputManager::EnumerateRawPointerDevices();
+	if (raw_mice.empty())
 	{
-		const QString name = (InputManager::MAX_POINTER_DEVICES == 1)
-			? JVSControlsWidget::tr("Mouse (system)") : QString::fromStdString(InputManager::GetPointerDeviceName(j));
-		combo->addItem(name, QString::fromStdString(InputManager::GetPointerDeviceName(j)));
+		combo->addItem(JVSControlsWidget::tr("Mouse (system)"), QString::fromStdString(InputManager::GetPointerDeviceName(0)));
+	}
+	else
+	{
+		for (const auto& [vidpid, display_name] : raw_mice)
+		{
+			const std::optional<u32> idx = InputManager::GetPointerIndexForRawDevice(vidpid);
+			if (idx.has_value())
+				combo->addItem(QString::fromStdString(display_name), QString::fromStdString(InputManager::GetPointerDeviceName(idx.value())));
+		}
 	}
 	for (const QPair<QString, QString>& dev : dialog->getDeviceList())
 	{
 		// Skip the "Mouse"/"Keyboard" pseudo-devices: no aim stick, and the mouse is already the pointer above.
 		if (dev.first == QLatin1String("Mouse") || dev.first == QLatin1String("Keyboard"))
 			continue;
-		combo->addItem(dev.second, dev.first);
+		// Raw mice are already listed above with their pointer slot.
+		if (dev.first.startsWith(QLatin1String("RawMouse-")))
+			continue;
+		combo->addItem(JVSControlsWidget::tr("%1 (Stick)").arg(dev.second), dev.first);
 	}
 	const int idx = combo->findData(current);
 	combo->setCurrentIndex((idx >= 0) ? idx : 0);
@@ -749,6 +761,16 @@ void JVSControlsWidget::buildLightgunPage()
 	};
 	makeAimCombo(1, "USB1");
 	makeAimCombo(2, "USB2");
+	QPushButton* refreshBtn = new QPushButton(tr("Refresh"), aimGroup);
+	connect(refreshBtn, &QPushButton::clicked, this, []() {
+		g_emu_thread->reloadInputDevices();
+		g_emu_thread->enumerateInputDevices(); // queued after the re-scan; onInputDevicesEnumerated repopulates the combos
+	});
+	ag->addWidget(refreshBtn, 1, 3);
+#ifdef _WIN32
+	m_rawInputStatus = new QLabel(aimGroup);
+	ag->addWidget(m_rawInputStatus, 2, 0, 1, 4);
+#endif
 	refreshAimDevices();
 	ag->setColumnStretch(0, 1);
 	QHBoxLayout* top = new QHBoxLayout();
@@ -925,6 +947,12 @@ void JVSControlsWidget::refreshAimDevices()
 	{
 		populateAimCombo(m_touchAimCombo, m_dialog, QString::fromStdString(m_dialog->getStringValue(
 			ACJV::CONFIG_SECTION, "TouchPointer", InputManager::GetPointerDeviceName(0).c_str())));
+	}
+	if (m_rawInputStatus)
+	{
+		m_rawInputStatus->setText(InputManager::IsUsingRawInput()
+			? QStringLiteral("%1 <b><span style='color:#2ecc71;'>ON</span></b>").arg(tr("Raw Input:"))
+			: QStringLiteral("%1 <b>OFF</b>").arg(tr("Raw Input:")));
 	}
 }
 

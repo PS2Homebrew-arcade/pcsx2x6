@@ -899,10 +899,12 @@ if(WIN32)
 	list(APPEND pcsx2InputSources
 		Input/DInputSource.cpp
 		Input/XInputSource.cpp
+		Input/RawInputSource.cpp
 	)
 	list(APPEND pcsx2InputHeaders
 		Input/DInputSource.h
 		Input/XInputSource.h
+		Input/RawInputSource.h
 	)
 endif()
 

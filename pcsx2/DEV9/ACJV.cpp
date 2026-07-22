@@ -670,9 +670,15 @@ const GunMapping& ACJV::GetGunMapping()
 // Per-player lightgun aim source: shared mouse by default, or the player's own controller stick when its
 // Aim Device is set to the pad (GunCon2 has_relative_binds pushes that stick's screen pos here).
 static bool s_gunAimJoystick[JVS_PLAYER_COUNT] = {};
+static u32 s_gunPointerIndex[JVS_PLAYER_COUNT] = {};
 static float s_gunRelativeDX[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};
 static float s_gunRelativeDY[JVS_PLAYER_COUNT] = {-1.0f, -1.0f};
 void ACJV::SetGunAimSource(u32 player, bool joystick) { if (player < JVS_PLAYER_COUNT) s_gunAimJoystick[player] = joystick; }
+void ACJV::SetGunPointerIndex(u32 player, u32 index)
+{
+	if (player < JVS_PLAYER_COUNT && index < InputManager::MAX_POINTER_DEVICES)
+		s_gunPointerIndex[player] = index;
+}
 void ACJV::SetGunRelativeAim(u32 player, float dx, float dy)
 {
 	if (player < JVS_PLAYER_COUNT) { s_gunRelativeDX[player] = dx; s_gunRelativeDY[player] = dy; }
@@ -694,21 +700,20 @@ void ACJV::SetGunOffscreenContour(float fraction) { s_gunContour = std::clamp(fr
 
 static void UpdateLightgunFromMouse()
 {
-	float mdx, mdy;
-	const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(0);
-	GSTranslateWindowToDisplayCoordinates(mx, my, &mdx, &mdy);
-
 	constexpr float edge_margin = 0.01f;
 	const auto& gm = ACJV::GetGunMapping();
 	const bool camera = (gm.board == GunBoardModel::CameraVN);
 	const bool side_switch = (gm.board == GunBoardModel::SideSwitchTC4);
 	const bool two_tier = (gm.board == GunBoardModel::TwoTierTC3);
 	const bool unclamped = camera || side_switch || two_tier;
-	float udx = -1.0f, udy = -1.0f;
-	if (unclamped)
-		GSTranslateWindowToDisplayCoordinatesUnclamped(mx, my, &udx, &udy);
+	const bool raw_input = InputManager::IsUsingRawInput();
 	for (u32 p = 0; p < JVS_PLAYER_COUNT; p++)
 	{
+		float mdx = -1.0f, mdy = -1.0f, udx = -1.0f, udy = -1.0f;
+		const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(raw_input ? s_gunPointerIndex[p] : 0);
+		GSTranslateWindowToDisplayCoordinates(mx, my, &mdx, &mdy);
+		if (unclamped)
+			GSTranslateWindowToDisplayCoordinatesUnclamped(mx, my, &udx, &udy);
 		const float dx = s_gunAimJoystick[p] ? s_gunRelativeDX[p] : (unclamped ? udx : mdx);
 		const float dy = s_gunAimJoystick[p] ? s_gunRelativeDY[p] : (unclamped ? udy : mdy);
 		if (camera)

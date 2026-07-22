@@ -25,6 +25,7 @@ public:
 	ControllerGlobalSettingsWidget(QWidget* parent, ControllerSettingsWindow* dialog);
 	~ControllerGlobalSettingsWidget();
 
+	void clearDeviceList();
 	void addDeviceToList(const QString& identifier, const QString& name);
 	void removeDeviceFromList(const QString& identifier);
 
