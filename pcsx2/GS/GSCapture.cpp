@@ -21,6 +21,7 @@
 #include "common/Threading.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <string>
@@ -137,7 +138,8 @@ namespace GSCapture
 {
 	static constexpr u32 NUM_FRAMES_IN_FLIGHT = 3;
 	static constexpr u32 MAX_PENDING_FRAMES = NUM_FRAMES_IN_FLIGHT * 2;
-	static constexpr u32 AUDIO_BUFFER_SIZE = Common::AlignUpPow2((MAX_PENDING_FRAMES * 48000) / 60, AudioStream::CHUNK_SIZE);
+	static constexpr s32 CAPTURE_AUDIO_RATE = 48000; // 72 kHz (SS256) is not a valid AAC rate, so overclocked consoles resample to this
+	static constexpr u32 AUDIO_BUFFER_SIZE = Common::AlignUpPow2(CAPTURE_AUDIO_RATE * 2, AudioStream::CHUNK_SIZE); // 2s: the 6-frame window deadlocks when video delivery stalls (arcade)
 	static constexpr u32 AUDIO_CHANNELS = 2;
 
 	struct PendingFrame
@@ -194,6 +196,8 @@ namespace GSCapture
 	static AVFrame* s_converted_audio_frame = nullptr;
 	static AVPacket* s_audio_packet = nullptr;
 	static SwrContext* s_swr_context = nullptr;
+	static SwrContext* s_audio_rate_swr = nullptr;
+	static std::atomic<u64> s_audio_clock_samples{0}; // shared clock for video timestamps
 	static AVDictionary* s_audio_codec_arguments = nullptr;
 	static s64 s_next_audio_pts = 0;
 	static u32 s_audio_frame_bps = 0;
@@ -636,6 +640,8 @@ bool GSCapture::BeginCapture(float fps, GSVector2i recommendedResolution, float 
 		s_next_video_pts = 0;
 	}
 
+	s_audio_clock_samples.store(0, std::memory_order_relaxed);
+
 	if (capture_audio)
 	{
 		// The CPU thread might have dumped some frames in here from the last capture, so clear it out.
@@ -672,12 +678,12 @@ bool GSCapture::BeginCapture(float fps, GSVector2i recommendedResolution, float 
 			return false;
 		}
 
-		const s32 sample_rate = SPU2::GetConsoleSampleRate();
+		const s32 console_rate = SPU2::GetConsoleSampleRate();
 		s_audio_codec_context->codec_type = AVMEDIA_TYPE_AUDIO;
 		s_audio_codec_context->bit_rate = GSConfig.AudioCaptureBitrate * 1000;
 		s_audio_codec_context->sample_fmt = AV_SAMPLE_FMT_FLT;
-		s_audio_codec_context->sample_rate = sample_rate;
-		s_audio_codec_context->time_base = {1, sample_rate};
+		s_audio_codec_context->sample_rate = CAPTURE_AUDIO_RATE;
+		s_audio_codec_context->time_base = {1, CAPTURE_AUDIO_RATE};
 #if LIBAVUTIL_VERSION_MAJOR < 57
 		s_audio_codec_context->channels = AUDIO_CHANNELS;
 		s_audio_codec_context->channel_layout = AV_CH_LAYOUT_STEREO;
@@ -713,16 +719,48 @@ bool GSCapture::BeginCapture(float fps, GSVector2i recommendedResolution, float 
 #endif
 
 			wrap_av_opt_set_int(s_swr_context, "in_channel_count", AUDIO_CHANNELS, 0);
-			wrap_av_opt_set_int(s_swr_context, "in_sample_rate", sample_rate, 0);
+			wrap_av_opt_set_int(s_swr_context, "in_sample_rate", CAPTURE_AUDIO_RATE, 0);
 			wrap_av_opt_set_sample_fmt(s_swr_context, "in_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
 
 			wrap_av_opt_set_int(s_swr_context, "out_channel_count", AUDIO_CHANNELS, 0);
-			wrap_av_opt_set_int(s_swr_context, "out_sample_rate", sample_rate, 0);
+			wrap_av_opt_set_int(s_swr_context, "out_sample_rate", CAPTURE_AUDIO_RATE, 0);
 			wrap_av_opt_set_sample_fmt(s_swr_context, "out_sample_fmt", s_audio_codec_context->sample_fmt, 0);
 			res = wrap_swr_init(s_swr_context);
 			if (res < 0)
 			{
 				LogAVError(res, "swr_init() failed: ");
+				InternalEndCapture(lock);
+				return false;
+			}
+		}
+
+		if (console_rate != CAPTURE_AUDIO_RATE)
+		{
+			s_audio_rate_swr = wrap_swr_alloc();
+			if (!s_audio_rate_swr)
+			{
+				LogAVError(AVERROR(ENOMEM), "swr_alloc() for rate conversion failed: ");
+				InternalEndCapture(lock);
+				return false;
+			}
+
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+			const AVChannelLayout rate_layout = AV_CHANNEL_LAYOUT_STEREO;
+			wrap_av_opt_set_chlayout(s_audio_rate_swr, "in_chlayout", &rate_layout, 0);
+			wrap_av_opt_set_chlayout(s_audio_rate_swr, "out_chlayout", &rate_layout, 0);
+#endif
+
+			wrap_av_opt_set_int(s_audio_rate_swr, "in_channel_count", AUDIO_CHANNELS, 0);
+			wrap_av_opt_set_int(s_audio_rate_swr, "in_sample_rate", console_rate, 0);
+			wrap_av_opt_set_sample_fmt(s_audio_rate_swr, "in_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
+
+			wrap_av_opt_set_int(s_audio_rate_swr, "out_channel_count", AUDIO_CHANNELS, 0);
+			wrap_av_opt_set_int(s_audio_rate_swr, "out_sample_rate", CAPTURE_AUDIO_RATE, 0);
+			wrap_av_opt_set_sample_fmt(s_audio_rate_swr, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
+			res = wrap_swr_init(s_audio_rate_swr);
+			if (res < 0)
+			{
+				LogAVError(res, "swr_init() for rate conversion failed: ");
 				InternalEndCapture(lock);
 				return false;
 			}
@@ -892,7 +930,22 @@ bool GSCapture::DeliverVideoFrame(GSTexture* stex)
 
 	const GSVector4i rc(0, 0, stex->GetWidth(), stex->GetHeight());
 	pf.tex->CopyFromTexture(rc, stex, rc, 0);
-	pf.pts = s_next_video_pts++;
+
+	// Clock video timestamps from the delivered audio samples so both streams share the emulated
+	// clock; modes whose real vsync rate differs from the nominal fps (480i = 59.826) can't drift.
+	if (s_audio_stream)
+	{
+		const u64 samples = s_audio_clock_samples.load(std::memory_order_relaxed);
+		const AVRational tb = s_video_codec_context->time_base;
+		const s64 clocked = static_cast<s64>((samples * static_cast<u64>(tb.den)) /
+											 (static_cast<u64>(CAPTURE_AUDIO_RATE) * static_cast<u64>(tb.num)));
+		pf.pts = std::max(clocked, s_next_video_pts);
+	}
+	else
+	{
+		pf.pts = s_next_video_pts;
+	}
+	s_next_video_pts = pf.pts + 1;
 	pf.state = PendingFrame::State::NeedsMap;
 
 	s_pending_frames_pos = (s_pending_frames_pos + 1) % MAX_PENDING_FRAMES;
@@ -1095,24 +1148,48 @@ void GSCapture::DeliverAudioPacket(const float* frames)
 	// through and clear them out for the next capture. If we happen to fill the buffer, *then* we'll lock, and check if
 	// the capture has stopped.
 
-	static constexpr u32 num_frames = AudioStream::CHUNK_SIZE;
+	u32 num_frames = AudioStream::CHUNK_SIZE;
+	float converted[AudioStream::CHUNK_SIZE * 2 * AUDIO_CHANNELS]; // resampler output can exceed the input count
+	if (s_audio_rate_swr)
+	{
+		const u8* input = reinterpret_cast<const u8*>(frames);
+		u8* output = reinterpret_cast<u8*>(converted);
+		const int produced = wrap_swr_convert(s_audio_rate_swr, &output, AudioStream::CHUNK_SIZE * 2, &input, AudioStream::CHUNK_SIZE);
+		if (produced <= 0)
+			return;
+		frames = converted;
+		num_frames = static_cast<u32>(produced);
+	}
 
 	if ((AUDIO_BUFFER_SIZE - s_audio_buffer_size.load(std::memory_order_acquire)) < num_frames)
 	{
 		// Need to wait for it to drain a bit.
 		std::unique_lock<std::mutex> lock(s_lock);
-		s_frame_encoded_cv.wait(lock, []() {
+		const bool drained = s_frame_encoded_cv.wait_for(lock, std::chrono::milliseconds(250), [num_frames]() {
 			return (!s_capturing.load(std::memory_order_acquire) ||
 					((AUDIO_BUFFER_SIZE - s_audio_buffer_size.load(std::memory_order_acquire)) >= num_frames));
 		});
 		if (!s_capturing.load(std::memory_order_acquire))
 			return;
+		if (!drained)
+		{
+			static bool warned = false;
+			if (!warned)
+			{
+				warned = true;
+				Console.Warning("GSCapture: audio buffer full and video is not draining, dropping samples.");
+			}
+			return; // drop rather than deadlock the EE behind a stalled encoder
+		}
 	}
 
-	// Since the buffer size is aligned to the SndOut packet size, we should always have space for at least one full packet.
-	pxAssert((AUDIO_BUFFER_SIZE - s_audio_buffer_write_pos) >= num_frames);
-	std::memcpy(s_audio_buffer.get() + (s_audio_buffer_write_pos * AUDIO_CHANNELS), frames, sizeof(float) * AUDIO_CHANNELS * num_frames);
+	// Resampled batches aren't chunk-aligned, so the write may wrap the ring.
+	const u32 first = std::min(num_frames, AUDIO_BUFFER_SIZE - s_audio_buffer_write_pos);
+	std::memcpy(s_audio_buffer.get() + (s_audio_buffer_write_pos * AUDIO_CHANNELS), frames, sizeof(float) * AUDIO_CHANNELS * first);
+	if (first < num_frames)
+		std::memcpy(s_audio_buffer.get(), frames + (first * AUDIO_CHANNELS), sizeof(float) * AUDIO_CHANNELS * (num_frames - first));
 	s_audio_buffer_write_pos = (s_audio_buffer_write_pos + num_frames) % AUDIO_BUFFER_SIZE;
+	s_audio_clock_samples.fetch_add(num_frames, std::memory_order_relaxed);
 
 	const u32 buffer_size = s_audio_buffer_size.fetch_add(num_frames, std::memory_order_release) + num_frames;
 
@@ -1138,8 +1215,6 @@ bool GSCapture::ProcessAudioPackets(s64 video_pts)
 	while (pending_frames > 0 && (!s_video_codec_context || wrap_av_compare_ts(video_pts, s_video_codec_context->time_base,
 																s_next_audio_pts, s_audio_codec_context->time_base) > 0))
 	{
-		pxAssert(pending_frames >= AudioStream::CHUNK_SIZE);
-
 		// In case the encoder is still using it.
 		if (s_audio_frame_pos == 0)
 			wrap_av_frame_make_writable(s_converted_audio_frame);
@@ -1268,6 +1343,10 @@ void GSCapture::InternalEndCapture(std::unique_lock<std::mutex>& lock)
 		s_capturing.store(false, std::memory_order_release);
 		StopEncoderThread(lock);
 
+		// Drain the buffered audio tail into the file instead of discarding it.
+		if (s_audio_stream && s_audio_buffer_size.load(std::memory_order_acquire) > 0)
+			ProcessAudioPackets(std::numeric_limits<s32>::max());
+
 		s_pending_frames = {};
 		s_pending_frames_pos = 0;
 		s_frames_pending_map = 0;
@@ -1335,6 +1414,8 @@ void GSCapture::InternalEndCapture(std::unique_lock<std::mutex>& lock)
 
 	if (s_swr_context)
 		wrap_swr_free(&s_swr_context);
+	if (s_audio_rate_swr)
+		wrap_swr_free(&s_audio_rate_swr);
 	if (s_audio_packet)
 		wrap_av_packet_free(&s_audio_packet);
 	if (s_converted_audio_frame)
