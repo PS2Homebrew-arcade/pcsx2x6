@@ -1418,11 +1418,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 					if (FileSystem::FileExists(src.c_str()) && !FileSystem::FileExists(dst.c_str()))
 						FileSystem::CopyFilePath(src.c_str(), dst.c_str(), false);
 					Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", card.c_str());
-				}
-				/// TODOx6: Decide if we want to lock mc1 access if .ACGAME does not ask for it
-				//   Only SoulCalibur2 uses it, with the conquest card. yet many games bring a DONGLEMAN that can still access both ports
-				//   It SHOULD not be possible: but What if A game with the appropiate dongleman driver damages a conquest card?
-				// ---> else Host::SetBaseBoolSettingValue("MemoryCards", "Slot2_Enable", false);
+				} else Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", "");
 
 				//FileMcd_Reopen(s_serial);
 				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf"));
