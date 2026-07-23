@@ -1369,17 +1369,21 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc", fmt::format("{}.chd", s_serial).c_str());
 				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
-				if (!ArcadeiLinkID.empty() &&
-					(ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN")) {
-					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
-					return false;
-				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
+				if (!ArcadeiLinkID.empty()) {
+					if (ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN") {
+						Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
+						return false;
+					} else
+						Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
+				}
 				s_title = INI.GetStringValue("game", "name");
 
-				ACJV::SetGameId(s_title); // Adapt JVS input to detected GAMEID
+				ACJV::SetGameId(s_serial); // Adapt JVS input to detected GAMEID
 				std::string platform = INI.GetStringValue("game", "platform", "");
-				if (platform.empty()) {
-					if (const GameDatabaseSchema::GameEntry* db_entry = GameDatabase::findGame(s_serial)) {
+
+				
+				if (const GameDatabaseSchema::GameEntry* db_entry = GameDatabase::findGame(s_serial)) {
+					if (platform.empty()) {
 						std::string_view s = db_entry->region;
 						if (s == "System246") {
 							PS2CLK = PS2CLK_DEFAULT;
@@ -1391,14 +1395,25 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 							PS2CLK = PS2CLK_SS256;
 							s_acgame_sys256 = true;
 						} else {
-							Error::SetString(error, TRANSLATE_STR("VMManager", "game platform parameter is missing from both acgame and gameDB"));
+							Error::SetString(error, TRANSLATE_STR("VMManager", "Cannot resolve platform variant"));
+							return false;
+						}
+					} else {
+						s_acgame_sys256 = (platform == "256" || platform == "super256");
+						PS2CLK = (platform == "super256") ? PS2CLK_SS256 : ((platform == "256") ? PS2CLK_S256 : PS2CLK_DEFAULT);
+					}
+					if (s_acmedia.empty()) {
+						s_acmedia = db_entry->arcade.media;
+						if (s_acmedia.empty()) {
+							Error::SetString(error, TRANSLATE_STR("VMManager", "Cannot resolve media type"));
 							return false;
 						}
 					}
-				} else {
-					s_acgame_sys256 = (platform == "256" || platform == "super256");
-					PS2CLK = (platform == "super256") ? PS2CLK_SS256 : ((platform == "256") ? PS2CLK_S256 : PS2CLK_DEFAULT);
+					if (s_title.empty() && !db_entry->name.empty()) {
+						s_acmedia = db_entry->name;
+					}
 				}
+
 				if (PS2CLK != PS2CLK_DEFAULT)
 					Console.WriteLnFmt(Color_Green, "ACGAME: System {} requested — overclock will be applied", platform);
 
@@ -1433,7 +1448,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				// ---> else Host::SetBaseBoolSettingValue("MemoryCards", "Slot2_Enable", false);
 
 				//FileMcd_Reopen(s_serial);
-				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf"));
+				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf", "boot.elf"));
 				EmuConfig.CurrentGameArgs = INI.GetStringValue("data", "args");
 				ACSRAM::filepath = Path::Combine(basedir, INI.GetStringValue("data", "sram", "sram.bin"));
 				// JVS device mode: an explicit jvsmode= in the .acgame overrides (force/legacy); otherwise it is
