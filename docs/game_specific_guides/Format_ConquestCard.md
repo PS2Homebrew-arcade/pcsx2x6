@@ -18,7 +18,7 @@ once you have it, you should be able to run the game and it should accept the co
 
 
 <figure markdown="span">
-![cardOK](./img/format_conquestcard1.png){ width="300" }
+![cardOK](../img/format_conquestcard1.png){ width="300" }
   <!-- <figcaption>Conquest card accepted</figcaption> -->
 </figure>
 
@@ -26,7 +26,7 @@ once you have it, you should be able to run the game and it should accept the co
 after that, you must enter TESTMODE and select the **DATA CLEAR** > **Clear All** option... like this:
 
 <figure markdown="span">
-  ![cardFormat](./img/format_conquestcard0.png){ width="300" }
+  ![cardFormat](../img/format_conquestcard0.png){ width="300" }
   <!-- <figcaption>Conquest card format schedule</figcaption> -->
 </figure>
 
