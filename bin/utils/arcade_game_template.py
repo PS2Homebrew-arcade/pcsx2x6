@@ -88,7 +88,7 @@ platform={platform}
 
 [data]
 subdir={gameid}
-elf=proverb.elf
+elf=boot.elf
 dongle={gameid}.ps2
 mediasrc={gameid}.chd
 media={media}
