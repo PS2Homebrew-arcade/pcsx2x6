@@ -151,6 +151,7 @@
     <addaction name="actionEnableCDVDVerboseReads"/>
     <addaction name="actionEnable_ACATA_Read_Logging"/>
     <addaction name="actionEnable_SRAM_Access_Logging"/>
+    <addaction name="actionEnable_ACJV_Access_Logging"/>
     <addaction name="actionEnable_RAM_Access_Logging"/>
     <addaction name="actionEnable_UART_Access_Logging"/>
    </widget>
@@ -1109,6 +1110,14 @@
    </property>
    <property name="text">
     <string>Enable Arcade UART RX/TX Logging</string>
+   </property>
+  </action>
+  <action name="actionEnable_ACJV_Access_Logging">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Log the contents of the input and output buffer of the JVS Controller</string>
    </property>
   </action>
  </widget>

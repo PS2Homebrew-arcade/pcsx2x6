@@ -1362,6 +1362,7 @@ struct Pcsx2Config
 		bool RAMVerboseReads{false};
 		bool ATAVerboseReads{false};
 		bool UARTVerbose{false};
+		bool ACJVVerbose{false};
 		
 		void LoadSave(SettingsWrapper& wrap);
 

@@ -560,6 +560,7 @@ void VMManager::SetDefaultLoggingSettings(SettingsInterface& si)
 	
 	si.SetBoolValue("Arcade", "ATAVerboseReads", false);
 	si.SetBoolValue("Arcade", "SRAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "ACJVVerbose", false);
 	si.SetBoolValue("Arcade", "RAMVerboseReads", false);
 	si.SetBoolValue("Arcade", "UARTVerbose", false);
 
