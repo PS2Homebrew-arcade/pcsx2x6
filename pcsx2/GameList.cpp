@@ -148,6 +148,7 @@ const char* GameList::RegionToString(Region region, bool translate)
 		TRANSLATE_NOOP("GameList", "PAL-UK"),
 		TRANSLATE_NOOP("GameList", "System246"),
 		TRANSLATE_NOOP("GameList", "System256"),
+		TRANSLATE_NOOP("GameList", "System SUPER256"),
 	};
 
 	const char* name = names.at(static_cast<int>(region));
@@ -192,6 +193,7 @@ const char* GameList::RegionToFlagFilename(Region region)
 		"gb",  // PAL-UK
 		"246B", // SYSTEM246
 		"256", // SYSTEM256
+		"256", // SYSTEM SUPER256 // TODOx6: make me an independent icon
 	};
 
 	return flag_names.at(static_cast<int>(region));
@@ -329,13 +331,29 @@ bool GameList::GetAcConfListEntry(const std::string& filename, GameList::Entry* 
 			
 		entry->path = filename;
 		entry->serial.clear();
-		entry->region = INI.GetStringValue("game", "platform") == "256" ? Region::SYSTEM256 : Region::SYSTEM246;
+		std::string_view s = INI.GetStringValue("game", "platform");
+		entry->region = Region::Other;
+		if (s == "246") entry->region = Region::SYSTEM246;
+		else if (s == "256") entry->region = Region::SYSTEM256;
+		else if (s == "super256") entry->region = Region::SYSTEMS256;
 		entry->type = EntryType::ARCADE;
 		entry->compatibility_rating = CompatibilityRating::Unknown;
 		entry->crc = 0x00000000;
 		entry->total_size = 0;
 		entry->title = INI.GetStringValue("game", "name");
 		entry->serial = INI.GetStringValue("game", "gameid");
+		if (!entry->serial.empty()) {
+			if (const GameDatabaseSchema::GameEntry* db_entry = GameDatabase::findGame(entry->serial)) {
+				if (entry->title.empty())
+					entry->title = db_entry->name;
+				if (entry->region == Region::Other) {
+					s = db_entry->region;
+					if (s == "System246") entry->region = Region::SYSTEM246;
+					else if (s == "System256") entry->region = Region::SYSTEM256;
+					else if (s == "System SUPER256") entry->region = Region::SYSTEMS256;
+				}
+			}
+		}
 
 	return true;
 }
@@ -442,6 +460,12 @@ GameList::Region GameList::ParseDatabaseRegion(const std::string_view db_region)
 		return Region::PAL_S;
 	else if (db_region.starts_with("PAL-UK"))
 		return Region::PAL_UK;
+	else if (db_region.starts_with("System246"))
+		return Region::SYSTEM246;
+	else if (db_region.starts_with("System256"))
+		return Region::SYSTEM256;
+	else if (db_region.starts_with("System Super256"))
+		return Region::SYSTEMS256;
 	else
 		return Region::Other;
 	// clang-format on

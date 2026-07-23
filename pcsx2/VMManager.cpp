@@ -198,7 +198,6 @@ static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
 static bool s_gs_open_on_initialize = false;
 static bool s_thread_affinities_set = false;
-static bool s_acgame_sys246 = false;
 static bool s_acgame_sys256 = false;
 
 static LimiterModeType s_limiter_mode = LimiterModeType::Nominal;
@@ -1367,8 +1366,6 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string subdir = INI.GetStringValue("data", "subdir", s_serial.c_str());
 				if (subdir != "") basedir = Path::AppendDirectory(basedir, subdir);
 				Console.WriteLnFmt(Color_Green, "ACGAME: basedir:'{}'", basedir);
-
-
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc", fmt::format("{}.chd", s_serial).c_str());
 				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
@@ -1380,10 +1377,28 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				s_title = INI.GetStringValue("game", "name");
 
 				ACJV::SetGameId(s_title); // Adapt JVS input to detected GAMEID
-				std::string platform = INI.GetStringValue("game", "platform", "246");
-				s_acgame_sys246 = (platform == "246" || platform == "256" || platform == "super256");
-				s_acgame_sys256 = (platform == "256" || platform == "super256");
-				PS2CLK = (platform == "super256") ? PS2CLK_SS256 : ((platform == "256") ? PS2CLK_S256 : PS2CLK_DEFAULT);
+				std::string platform = INI.GetStringValue("game", "platform", "");
+				if (platform.empty()) {
+					if (const GameDatabaseSchema::GameEntry* db_entry = GameDatabase::findGame(s_serial)) {
+						std::string_view s = db_entry->region;
+						if (s == "System246") {
+							PS2CLK = PS2CLK_DEFAULT;
+							s_acgame_sys256 = false;
+						} else if (s == "System256") {
+							PS2CLK = PS2CLK_S256;
+							s_acgame_sys256 = true;
+						} else if (s == "System SUPER256") {
+							PS2CLK = PS2CLK_SS256;
+							s_acgame_sys256 = true;
+						} else {
+							Error::SetString(error, TRANSLATE_STR("VMManager", "game platform parameter is missing from both acgame and gameDB"));
+							return false;
+						}
+					}
+				} else {
+					s_acgame_sys256 = (platform == "256" || platform == "super256");
+					PS2CLK = (platform == "super256") ? PS2CLK_SS256 : ((platform == "256") ? PS2CLK_S256 : PS2CLK_DEFAULT);
+				}
 				if (PS2CLK != PS2CLK_DEFAULT)
 					Console.WriteLnFmt(Color_Green, "ACGAME: System {} requested — overclock will be applied", platform);
 
@@ -1715,8 +1730,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	s_cpu_implementation_changed = false;
 	UpdateCPUImplementations();
 	mmap_ResetBlockTracking();
-	if (s_acgame_sys246)
-		EmuConfig.Cpu.ExtraMemory = true;
+	EmuConfig.Cpu.ExtraMemory = true;
 	if (s_acgame_sys256)
 	{
 		s_sys256_mode = true;
