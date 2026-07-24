@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Tovarichtch
+// SPDX-FileCopyrightText: 2026 PCSX2X6 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once

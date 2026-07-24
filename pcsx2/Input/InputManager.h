@@ -28,6 +28,8 @@ enum class InputSourceType : u32
 	DInput,
 	XInput,
 	RawInput,
+#elif defined(__linux__)
+	Evdev,
 #endif
 	Count,
 };
@@ -296,7 +298,7 @@ namespace InputManager
 	/// The pad vibration state will internally remain, so that when emulation is unpaused, the effect resumes.
 	void PauseVibration();
 
-	/// Returns true if the RawInput source is active (Windows multi-mouse).
+	/// Returns true if a per-device pointer source is active (Windows RawInput, Linux evdev).
 	bool IsUsingRawInput();
 
 	/// Returns the pointer index assigned to a raw device, or nullopt.
