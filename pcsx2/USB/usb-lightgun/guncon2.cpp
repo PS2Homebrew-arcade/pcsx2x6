@@ -580,14 +580,16 @@ namespace usb_lightgun
 				s->cursor_scale != cursor_scale ||
 				s->cursor_color != cursor_color);
 
+		const u32 other_port = s->port ^ 1u;
+		const std::string other_binding = USB::GetConfigString(si, other_port, TypeName(), "Pointer");
+		const bool other_aims_mouse = USB::GetConfigDevice(si, other_port) == TypeName() &&
+			StringUtil::StartsWithNoCase(other_binding, "Pointer-") &&
+			!USB::GetConfigString(si, other_port, TypeName(), "cursor_path").empty();
+		const s32 other_slot = static_cast<s32>(InputManager::IsUsingRawInput() ? PointerIndexFromBinding(other_binding) : 0u);
+		const bool other_shares_slot = other_aims_mouse && other_slot == new_pointer_index;
+
 		if (cursor_changed)
 		{
-			const u32 other_port = s->port ^ 1u;
-			const std::string other_binding = USB::GetConfigString(si, other_port, TypeName(), "Pointer");
-			const bool other_aims_mouse = USB::GetConfigDevice(si, other_port) == TypeName() &&
-				StringUtil::StartsWithNoCase(other_binding, "Pointer-") &&
-				!USB::GetConfigString(si, other_port, TypeName(), "cursor_path").empty();
-			const s32 other_slot = static_cast<s32>(InputManager::IsUsingRawInput() ? PointerIndexFromBinding(other_binding) : 0u);
 			if (prev_pointer_index != new_pointer_index &&
 				(prev_pointer_index >= static_cast<s32>(InputManager::MAX_POINTER_DEVICES) ||
 					!(other_aims_mouse && other_slot == prev_pointer_index)))
@@ -609,7 +611,8 @@ namespace usb_lightgun
 		// Always re-assert the configured cursor.
 		// ImGui cursor state can be cleared during VM/device shutdown even when
 		// GunCon2 settings did not change between games.
-		if (!s->cursor_path.empty())
+		// Skip while a lower port owns the shared cursor slot, so its freshly changed scale survives.
+		if (!s->cursor_path.empty() && !(other_shares_slot && s->port != 0 && !s->has_relative_binds))
 		{
 			ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
 			s->UpdateSoftwarePointerPosition();
