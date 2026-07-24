@@ -869,33 +869,6 @@
     <ClCompile Include="DEV9\DEV9.cpp">
       <Filter>System\Ps2\DEV9</Filter>
     </ClCompile>
-    <ClCompile Include="DEV9\ACRAM.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACSRAM.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACATA.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACATA_IO.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACATA_IO_CHD.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACATAPI.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACJV.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACUART.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
-    <ClCompile Include="DEV9\ACCORE.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
-    </ClCompile>
     <ClCompile Include="DEV9\flash.cpp">
       <Filter>System\Ps2\DEV9</Filter>
     </ClCompile>
@@ -1482,6 +1455,17 @@
     <ClCompile Include="GS\GSDrawingEnvironment.cpp">
       <Filter>System\Ps2\GS\Renderers\Software</Filter>
     </ClCompile>
+    <ClCompile Include="DEV9\ACRAM.cpp" />
+    <ClCompile Include="DEV9\ACSRAM.cpp" />
+    <ClCompile Include="DEV9\ACATA.cpp" />
+    <ClCompile Include="DEV9\ACATA_IO.cpp" />
+    <ClCompile Include="DEV9\ACATA_IO_CHD.cpp" />
+    <ClCompile Include="DEV9\ACATAPI.cpp" />
+    <ClCompile Include="DEV9\ACJV.cpp" />
+    <ClCompile Include="DEV9\ACUART.cpp" />
+    <ClCompile Include="DEV9\ACCORE.cpp" />
+    <ClCompile Include="Outputs\Outputs.cpp" />
+    <ClCompile Include="Outputs\WinOutputs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Patch.h">
@@ -2452,6 +2436,9 @@
     <ClInclude Include="SIO\Pad\PadNegcon.h">
       <Filter>System\Ps2\Iop\SIO\PAD</Filter>
     </ClInclude>
+    <ClInclude Include="Outputs\Outputs.h" />
+    <ClInclude Include="Outputs\WinOutputs.h" />
+    <ClInclude Include="Outputs\Types.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuildStep Include="rdebug\deci2.h">

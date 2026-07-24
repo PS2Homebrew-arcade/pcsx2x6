@@ -136,6 +136,13 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(m_dialog->getProfileSettingsInterface(), m_ui.suppressDaemon,
 		"Arcade", "SuppressDaemon", true);
 
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(m_dialog->getProfileSettingsInterface(), m_ui.outputsEnable,
+		ACJV::CONFIG_SECTION, "OutputsEnabled", false);
+
+	#ifndef _WIN32
+	m_ui.outputsEnable->hide();
+	#endif
+
 	// Item order MUST match the QStackedWidget page order in the .ui.
 	m_ui.pageSelector->addItem(tr("System"));
 	m_ui.pageSelector->addItem(tr("Fighting"));
