@@ -1450,7 +1450,8 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
 				int R;
 				if ((R = ACATA::TH::IO_OpenImage())!=0) {
-					Error::SetString(error, std::string("cannot open arcade media image"));
+					Error::SetString(error, ACATA::TH::open_error.empty() ?
+						std::string("cannot open arcade media image") : ACATA::TH::open_error);
 					return false;
 				}
 				if (s_acmedia == "CD" && !ACATA::imgpath.empty()) {
