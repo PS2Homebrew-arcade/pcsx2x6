@@ -95,6 +95,7 @@ struct GunMapping {
     u16 p1_trigger;
     u16 p2_trigger;
     GunBoardModel board;
+    u16 link_2p; // linked-cabinet side switch: held = game runs as 2P/right side
 };
 
 namespace ACJV {

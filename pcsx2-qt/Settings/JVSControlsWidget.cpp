@@ -19,7 +19,9 @@
 #include <QtCore/QEvent>
 #include <QtGui/QAction>
 #include <QtGui/QCursor>
+#include <QtGui/QKeyEvent>
 #include <QtGui/QShowEvent>
+#include <QtWidgets/QApplication>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
@@ -773,9 +775,15 @@ void JVSControlsWidget::buildLightgunPage()
 #endif
 	refreshAimDevices();
 	ag->setColumnStretch(0, 1);
+	QGroupBox* cabinet = new QGroupBox(tr("Cabinet settings"), this);
+	QVBoxLayout* cl = new QVBoxLayout(cabinet);
+	QCheckBox* link2p = new QCheckBox(tr("Link as 2P (right side)"), cabinet);
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, link2p, ACJV::CONFIG_SECTION, "LightgunLinkAs2P", false);
+	cl->addWidget(link2p);
+	cl->addStretch(1);
 	QHBoxLayout* top = new QHBoxLayout();
 	top->addWidget(aimGroup, 1);
-	top->addStretch(1);
+	top->addWidget(cabinet, 1);
 	m_ui.lightgunPageLayout->addLayout(top);
 
 	QGroupBox* group = new QGroupBox(tr("Light gun buttons"), this);
@@ -926,10 +934,75 @@ void JVSControlsWidget::buildTouchPage()
 	m_ui.touchPageLayout->addStretch(1);
 }
 
+namespace
+{
+// Community easter egg: press 3 three times on the Standard page to light up "Button 3".
+class Button3Egg final : public QObject
+{
+public:
+	Button3Egg(QLabel* label, QWidget* page)
+		: QObject(label)
+		, m_label(label)
+		, m_page(page)
+	{
+		qApp->installEventFilter(this);
+	}
+
+protected:
+	bool eventFilter(QObject*, QEvent* event) override
+	{
+		if (event->type() != QEvent::KeyPress)
+			return false;
+		const QKeyEvent* ke = static_cast<QKeyEvent*>(event);
+		// An app-level filter sees the same key event once per widget it propagates through.
+		if (ke->key() != Qt::Key_3 || ke->isAutoRepeat() || ke->timestamp() == m_last_press ||
+			m_timer != 0 || !m_page->isVisible())
+			return false;
+		m_presses = (ke->timestamp() - m_last_press > 1200) ? 1 : m_presses + 1;
+		m_last_press = ke->timestamp();
+		if (m_presses == 3)
+			m_timer = startTimer(50);
+		return false;
+	}
+
+	void timerEvent(QTimerEvent*) override
+	{
+		if (!m_page->isVisible())
+		{
+			killTimer(m_timer);
+			m_timer = 0;
+			m_presses = 0;
+			m_label->setStyleSheet(QString());
+			return;
+		}
+		m_hue = (m_hue + 10) % 360;
+		m_label->setStyleSheet(
+			QStringLiteral("color: %1; font-weight: bold;").arg(QColor::fromHsv(m_hue, 255, 255).name()));
+	}
+
+private:
+	QLabel* m_label;
+	QWidget* m_page;
+	quint64 m_last_press = 0;
+	int m_presses = 0;
+	int m_timer = 0;
+	int m_hue = 0;
+};
+} // namespace
+
 void JVSControlsWidget::buildStandardPage()
 {
 	buildJvsLayoutPage(this, m_dialog->getProfileSettingsInterface(), m_dialog,
 		m_ui.standardPageLayout, ACJV::GetStandardLayouts());
+
+	for (QLabel* label : m_ui.standardPage->findChildren<QLabel*>())
+	{
+		if (label->text() == QStringLiteral("Button 3"))
+		{
+			new Button3Egg(label, m_ui.standardPage);
+			return;
+		}
+	}
 }
 
 // (Re)fill the lightgun Aim Device combos; devices enumerate asynchronously, so this reruns on show.

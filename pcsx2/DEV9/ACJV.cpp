@@ -70,6 +70,7 @@ static bool s_suppress_daemon = true;
 static std::atomic<bool> s_sinden_border_enabled{false};
 static std::atomic<int> s_sinden_border_mode{0};
 static std::atomic<int> s_sinden_border_thickness{10};
+static std::atomic<bool> s_lightgun_link_2p{false};
 static std::string s_gameid;
 
 std::span<const ACJV::DIPSwitchInfo> ACJV::GetDIPSwitches()
@@ -248,6 +249,7 @@ void ACJV::LoadConfig(const SettingsInterface& si)
 	s_sinden_border_enabled = si.GetBoolValue(CONFIG_SECTION, "SindenBorderEnabled", false);
 	s_sinden_border_mode = si.GetIntValue(CONFIG_SECTION, "SindenBorderMode", 0);
 	s_sinden_border_thickness = si.GetIntValue(CONFIG_SECTION, "SindenBorderThickness", 10);
+	s_lightgun_link_2p = si.GetBoolValue(CONFIG_SECTION, "LightgunLinkAs2P", false);
 }
 
 void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface& src_si, bool copy_settings, bool copy_bindings)
@@ -264,6 +266,7 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "AnalogSensitivity");
 		dest_si->CopyFloatValue(src_si, CONFIG_SECTION, "TriggerDeadzone");
 		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "InvertSteering");
+		dest_si->CopyBoolValue(src_si, CONFIG_SECTION, "LightgunLinkAs2P");
 	}
 
 	if (copy_bindings)
@@ -371,14 +374,15 @@ static float m_wheelGas    = 0.0f; // right trigger (R2)
 static float m_wheelBrake  = 0.0f; // left trigger  (L2)
 
 // Per-game JVS button mapping for lightgun games, keyed by NM game ID (see issue #9).
-// Field order: pedal, sensor, sensor_active_high, p1_start, p2_start, p1_trigger, p2_trigger, board
+// Field order: pedal, sensor, sensor_active_high, p1_start, p2_start, p1_trigger, p2_trigger, board, link_2p
 // Each button value is a JVS bit from JVSButton enum. 0 = not used for this game.
+// link_2p: "LINK AS" cabinet side switch bit the game polls (TC3 reads Push3 as MIU-I/O, TC4 reads Push4).
 static const GunMapping s_default_gun_mapping = {JVS_BTN_3, JVS_BTN_RIGHT, false, 0, 0, JVS_BTN_2, 0, GunBoardModel::Classic};
 static const std::map<std::string, GunMapping> s_gun_mappings = {
 	{"NM00003", {0,            0x200,         true,  JVS_BTN_3,  JVS_BTN_6, JVS_BTN_2,    JVS_BTN_5, GunBoardModel::CameraVN}},      // Vampire Night
-	{"NM00012", {JVS_BTN_6,    0,             false, 0,          0,          JVS_BTN_2,    0,         GunBoardModel::TwoTierTC3}},     // Time Crisis 3
+	{"NM00012", {JVS_BTN_6,    0,             false, 0,          0,          JVS_BTN_2,    0,         GunBoardModel::TwoTierTC3, JVS_BTN_3}},    // Time Crisis 3
 	{"NM00021", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0,         GunBoardModel::Classic}},       // Cobra The Arcade
-	{"NM00032", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0,         GunBoardModel::SideSwitchTC4}}, // Time Crisis 4
+	{"NM00032", {JVS_BTN_3,    JVS_BTN_RIGHT, false, 0,          0,          JVS_BTN_LEFT, 0,         GunBoardModel::SideSwitchTC4, JVS_BTN_4}}, // Time Crisis 4
 };
 static const GunMapping* m_gunMapping = &s_default_gun_mapping;
 
@@ -1035,7 +1039,9 @@ void do_jvs_packet(const u8* input, u8* output) {
 			(*output++) = m_testButtonState|(s_dip_switch_state & TESTMODE);
 			//(*output++) = (m_jvsSystemButtonState == 0x03) ? 0x80 : 0;  //Test
 
-			const u16 p1btn = m_jvsButtonState[0] | m_jvsMacroButtonState[0];
+			u16 p1btn = m_jvsButtonState[0] | m_jvsMacroButtonState[0];
+			if (s_lightgun_link_2p)
+				p1btn |= m_gunMapping->link_2p; // test menu reads it as LINK AS : 2 (RIGHT)
 			(*output++) = static_cast<u8>(p1btn);      //Player 1
 			(*output++) = static_cast<u8>(p1btn >> 8); //Player 1
 			(*dstSize) += 4;
