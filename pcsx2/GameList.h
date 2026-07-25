@@ -68,6 +68,7 @@ namespace GameList
 		PAL_UK,
 		SYSTEM246,
 		SYSTEM256,
+		SYSTEMS256,
 		Count
 	};
 

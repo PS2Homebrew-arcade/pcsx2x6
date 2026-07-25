@@ -198,7 +198,6 @@ static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
 static bool s_gs_open_on_initialize = false;
 static bool s_thread_affinities_set = false;
-static bool s_acgame_sys246 = false;
 static bool s_acgame_sys256 = false;
 
 static LimiterModeType s_limiter_mode = LimiterModeType::Nominal;
@@ -1353,22 +1352,8 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				return false;
 			} else {
 				Console.WriteLn(Color_Green, "# ARCADE GAME CONFIG FILE DETECTED");
-				std::string basedir = Path::ToNativePath(Path::GetDirectory(filename))+FS_OSPATH_SEPARATOR_CHARACTER;
-				std::string subdir = INI.GetStringValue("data", "subdir");
-				if (subdir != "") basedir = Path::AppendDirectory(basedir, subdir);
-				Console.WriteLnFmt(Color_Green, "ACGAME: basedir:'{}'", basedir);
 				std::string s_acmedia, s_imgname, s_serial;
-				s_acmedia = INI.GetStringValue("data", "media");
-				s_imgname = INI.GetStringValue("data", "mediasrc");
-				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
-				if (!ArcadeiLinkID.empty() &&
-					(ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN")) {
-					Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
-					return false;
-				} else Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
-				s_title = s_serial = INI.GetStringValue("game", "name");
-				s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
-				s_acgame_serial = s_serial;
+				s_acgame_serial = s_arcade_gameid = s_disc_serial = s_serial = INI.GetStringValue("game", "gameid");
 				bool idvalid = (s_serial.length() == 7 && (s_serial[0] == 'N' && s_serial[1] == 'M'));
     			for (int i = 2; idvalid && i < 7; i++)
     			    idvalid = (s_serial[i] >= '0' && s_serial[i] <= '9');
@@ -1377,18 +1362,60 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 					return false;
 				}
 
+				std::string basedir = Path::ToNativePath(Path::GetDirectory(filename))+FS_OSPATH_SEPARATOR_CHARACTER;
+				std::string subdir = INI.GetStringValue("data", "subdir", s_serial.c_str());
+				if (subdir != "") basedir = Path::AppendDirectory(basedir, subdir);
+				Console.WriteLnFmt(Color_Green, "ACGAME: basedir:'{}'", basedir);
+				s_acmedia = INI.GetStringValue("data", "media");
+				s_imgname = INI.GetStringValue("data", "mediasrc", fmt::format("{}.chd", s_serial).c_str());
+				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
+				if (!ArcadeiLinkID.empty()) {
+					if (ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN") {
+						Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
+						return false;
+					} else
+						Console.WriteLnFmt(Color_Green, "system256 Region: changing iLinkID to {}", ArcadeiLinkID);
+				}
+				s_title = INI.GetStringValue("game", "name");
+
 				ACJV::SetGameId(s_serial); // Adapt JVS input to detected GAMEID
 				std::string platform = INI.GetStringValue("game", "platform", "");
-				s_acgame_sys246 = (platform == "246" || platform == "256" || platform == "super256");
-				s_acgame_sys256 = (platform == "256" || platform == "super256");
-				if (platform == "super256")
-					PS2CLK = PS2CLK_SS256;
-				else if (s_acgame_sys256)
-					PS2CLK = PS2CLK_S256;
-				if (s_acgame_sys256)
-				{
-					Console.WriteLnFmt(Color_Green, "ACGAME: System {} requested — overclock will be applied", platform);
+
+				
+				if (const GameDatabaseSchema::GameEntry* db_entry = GameDatabase::findGame(s_serial)) {
+					if (platform.empty()) {
+						std::string_view s = db_entry->region;
+						if (s == "System246") {
+							PS2CLK = PS2CLK_DEFAULT;
+							s_acgame_sys256 = false;
+						} else if (s == "System256") {
+							PS2CLK = PS2CLK_S256;
+							s_acgame_sys256 = true;
+						} else if (s == "System SUPER256") {
+							PS2CLK = PS2CLK_SS256;
+							s_acgame_sys256 = true;
+						} else {
+							Error::SetString(error, TRANSLATE_STR("VMManager", "Cannot resolve platform variant"));
+							return false;
+						}
+					} else {
+						s_acgame_sys256 = (platform == "256" || platform == "super256");
+						PS2CLK = (platform == "super256") ? PS2CLK_SS256 : ((platform == "256") ? PS2CLK_S256 : PS2CLK_DEFAULT);
+					}
+					if (s_acmedia.empty()) {
+						s_acmedia = db_entry->arcade.media;
+						if (s_acmedia.empty()) {
+							Error::SetString(error, TRANSLATE_STR("VMManager", "Cannot resolve media type"));
+							return false;
+						}
+					}
+					if (s_title.empty() && !db_entry->name.empty()) {
+						s_title = db_entry->name;
+					}
 				}
+
+				if (PS2CLK != PS2CLK_DEFAULT)
+					Console.WriteLnFmt(Color_Green, "ACGAME: System {} requested — overclock will be applied", platform);
 
 				// When subdir= is set, basedir points to the subdir (e.g. roms/tekken4/).
 				// Dongle/card files may live elsewhere, so fall back to acgame dir and memcards/.
@@ -1396,32 +1423,28 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string card;
 				// Slot 1 (mc0:) = dongle (boot modules only, no save data).
 				// Always overwrite — DONGLEMAN corrupts this file at runtime.
-				if ((card = INI.GetStringValue("data", "dongle", "")) != "") {
-					std::string src = Path::Combine(basedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(acgamedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(Path::Combine(acgamedir, "memcards"), card);
-					std::string dst = Path::Combine(EmuFolders::MemoryCards, card);
-					if (FileSystem::FileExists(src.c_str()))
-						FileSystem::CopyFilePath(src.c_str(), dst.c_str(), true);
+				if ((card = INI.GetStringValue("data", "dongle", fmt::format("{}.ps2", s_serial).c_str())) != "") {
+					std::string src = Path::Combine(EmuFolders::MemoryCards, card);
+					if (!FileSystem::FileExists(src.c_str())) {
+						Error::SetStringFmt(error, "requested dongle image does not exist! '{}'", card);
+						Console.ErrorFmt("ACGAME: cannot open a dongle file at location '{}'", src);
+						return false;
+					}
 					Host::SetBaseStringSettingValue("MemoryCards", "Slot1_Filename", card.c_str());
 				}
 				// Slot 2 (mc1:) = save card (e.g. SC2 conquest). Never overwrite existing saves.
 				if ((card = INI.GetStringValue("data", "card", "")) != "") {
-					std::string src = Path::Combine(basedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(acgamedir, card);
-					if (!FileSystem::FileExists(src.c_str()))
-						src = Path::Combine(Path::Combine(acgamedir, "memcards"), card);
-					std::string dst = Path::Combine(EmuFolders::MemoryCards, card);
-					if (FileSystem::FileExists(src.c_str()) && !FileSystem::FileExists(dst.c_str()))
-						FileSystem::CopyFilePath(src.c_str(), dst.c_str(), false);
+					std::string src = Path::Combine(EmuFolders::MemoryCards, card);
+					if (!FileSystem::FileExists(src.c_str())) {
+						Error::SetStringFmt(error, "requested memcard image does not exist! '{}'", card);
+						Console.ErrorFmt("ACGAME: cannot open a card file at location '{}'", src);
+						return false;
+					}
 					Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", card.c_str());
 				} else Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", "");
 
 				//FileMcd_Reopen(s_serial);
-				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf"));
+				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf", "boot.elf"));
 				EmuConfig.CurrentGameArgs = INI.GetStringValue("data", "args");
 				ACSRAM::filepath = Path::Combine(basedir, INI.GetStringValue("data", "sram", "sram.bin"));
 				// JVS device mode: an explicit jvsmode= in the .acgame overrides (force/legacy); otherwise it is
@@ -1719,8 +1742,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	s_cpu_implementation_changed = false;
 	UpdateCPUImplementations();
 	mmap_ResetBlockTracking();
-	if (s_acgame_sys246)
-		EmuConfig.Cpu.ExtraMemory = true;
+	EmuConfig.Cpu.ExtraMemory = true;
 	if (s_acgame_sys256)
 	{
 		s_sys256_mode = true;

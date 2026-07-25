@@ -109,6 +109,11 @@ namespace GameDatabaseSchema
 		std::unordered_map<u32, std::string> patches;
 		std::vector<Patch::DynamicPatch> dynaPatches;
 
+		struct _arcade {
+			std::string bootprog;
+			std::string media;
+			std::string input;
+		}arcade;
 		// Returns the list of memory card serials as a `/` delimited string
 		std::string memcardFiltersAsString() const;
 		const std::string* findPatch(u32 crc) const;

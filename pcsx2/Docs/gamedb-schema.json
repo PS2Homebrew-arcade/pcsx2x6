@@ -23,7 +23,7 @@
         "region": {
           "type": "string",
           "description": "The region code for the game, for example NTSC-U",
-          "pattern": "^(?:NTSC-(?:B|C|E|HK|J|K|M|T|U).*|PAL-?(?:A|B|E|F|G|I|M|N|P|R|S|U)?.*|Other|System246|System256)$"
+          "pattern": "^(?:NTSC-(?:B|C|E|HK|J|K|M|T|U).*|PAL-?(?:A|B|E|F|G|I|M|N|P|R|S|U)?.*|Other|System246|System256|System SUPER256)$"
         },
         "bootprog": {
           "type": "string",

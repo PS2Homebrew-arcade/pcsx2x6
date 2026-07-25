@@ -225,7 +225,7 @@ NM00031:
     nativeScaling: 2 # Fixes misaligned bloom.
 NM00032:
   name: Time Crisis 4
-  region: System256
+  region: System SUPER256
   bootprog: TC4LOAD
   media: HDD
   input: lightgun
