@@ -1671,7 +1671,7 @@ void FullscreenUI::SwitchToGameSettings(const std::string_view serial, u32 crc)
 
 void FullscreenUI::SwitchToGameSettings()
 {
-	if (s_current_disc_serial.empty() || s_current_disc_crc == 0)
+	if (s_current_disc_serial.empty())
 		return;
 
 	auto lock = GameList::GetLock();

@@ -1722,6 +1722,7 @@ void FullscreenUI::DrawPauseMenu(MainWindowType type)
 				// NOTE: Menu close must come first, because otherwise VM destruction options will race.
 				const bool can_load_state = s_current_disc_crc != 0 && !Achievements::IsHardcoreModeActive();
 				const bool can_save_state = s_current_disc_crc != 0;
+				const bool can_open_game_settings = !s_current_disc_serial.empty();
 
 				if (just_focused)
 					ImGui::SetFocusID(ImGui::GetID(FSUI_ICONSTR(ICON_FA_PLAY, "Resume Game")), ImGui::GetCurrentWindow());
@@ -1747,7 +1748,7 @@ void FullscreenUI::DrawPauseMenu(MainWindowType type)
 						s_current_main_window = MainWindowType::None;
 				}
 
-				if (ActiveButton(FSUI_ICONSTR(ICON_FA_WRENCH, "Game Properties"), false, can_save_state))
+				if (ActiveButton(FSUI_ICONSTR(ICON_FA_WRENCH, "Game Properties"), false, can_open_game_settings))
 				{
 					SwitchToGameSettings();
 				}
