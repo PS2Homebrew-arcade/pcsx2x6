@@ -1410,7 +1410,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 						}
 					}
 					if (s_title.empty() && !db_entry->name.empty()) {
-						s_acmedia = db_entry->name;
+						s_title = db_entry->name;
 					}
 				}
 
