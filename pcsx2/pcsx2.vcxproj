@@ -285,6 +285,7 @@
     </ClCompile>
     <ClCompile Include="Host.cpp" />
     <ClCompile Include="Input\DInputSource.cpp" />
+    <ClCompile Include="Input\RawInputSource.cpp" />
     <ClCompile Include="Input\InputManager.cpp" />
     <ClCompile Include="Input\InputSource.cpp" />
     <ClCompile Include="Input\SDLInputSource.cpp" />
@@ -731,6 +732,7 @@
     </ClInclude>
     <ClInclude Include="Host.h" />
     <ClInclude Include="Input\DInputSource.h" />
+    <ClInclude Include="Input\RawInputSource.h" />
     <ClInclude Include="Input\InputManager.h" />
     <ClInclude Include="Input\InputSource.h" />
     <ClInclude Include="Input\SDLInputSource.h" />

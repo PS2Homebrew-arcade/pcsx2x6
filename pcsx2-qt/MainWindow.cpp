@@ -61,6 +61,8 @@
 
 #ifdef _WIN32
 #include "common/RedtapeWindows.h"
+#include "pcsx2/Input/InputSource.h"
+#include "pcsx2/Input/RawInputSource.h"
 #include <Dbt.h>
 #endif
 
@@ -2496,6 +2498,18 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
 				if (GetRawInputData((HRAWINPUT)msg->lParam, RID_INPUT, lpb.data(), &dwSize, sizeof(RAWINPUTHEADER)) == dwSize)
 				{
 					const RAWINPUT* raw = reinterpret_cast<const RAWINPUT*>(lpb.data());
+
+					// dispatch to RawInputSource for per-device tracking
+					InputSource* raw_source = InputManager::GetInputSourceInterface(InputSourceType::RawInput);
+					if (raw_source && raw_source->IsInitialized())
+					{
+						HWND render_hwnd = m_display_surface ?
+							reinterpret_cast<HWND>(m_display_surface->winId()) : static_cast<HWND>(nullptr);
+						pxAssertMsg(dynamic_cast<RawInputSource*>(raw_source), "Expected RawInputSource");
+						static_cast<RawInputSource*>(raw_source)->ProcessRawInput(raw, render_hwnd);
+					}
+
+					// system-cursor lock/clamp, always active
 					if (raw->header.dwType == RIM_TYPEMOUSE)
 					{
 						const RAWMOUSE& mouse = raw->data.mouse;
@@ -2958,13 +2972,17 @@ void MainWindow::doGameSettings(const char* category)
 	// prefer to use a game list entry, if we have one, that way the summary is populated
 	if (!s_current_disc_path.isEmpty() || !s_current_elf_override.isEmpty())
 	{
+		// Arcade boots through proverb.elf, so the path lookup would find that ELF instead of the game.
+		const bool arcade = s_current_disc_crc == 0 && !s_current_disc_serial.isEmpty() && !s_current_elf_override.isEmpty();
 		const QString& path = (s_current_elf_override.isEmpty() ? s_current_disc_path : s_current_elf_override);
 
 		std::optional<GameList::Entry> entry;
 
 		{
 			auto lock = GameList::GetLock();
-			const GameList::Entry* entry_ptr = GameList::GetEntryForPath(path.toUtf8().constData());
+			const GameList::Entry* entry_ptr = arcade ?
+				GameList::GetEntryBySerialAndCRC(s_current_disc_serial.toStdString(), s_current_disc_crc) :
+				GameList::GetEntryForPath(path.toUtf8().constData());
 			if (entry_ptr)
 				entry = *entry_ptr;
 		}
@@ -2972,7 +2990,7 @@ void MainWindow::doGameSettings(const char* category)
 		if (entry.has_value())
 		{
 			SettingsWindow::openGamePropertiesDialog(
-				&*entry, entry->title, entry->serial, entry->crc, !s_current_elf_override.isEmpty(), category);
+				&*entry, entry->title, entry->serial, entry->crc, entry->type == GameList::EntryType::ELF, category);
 			return;
 		}
 	}

@@ -28,6 +28,28 @@ static u32 atapi_dma_len = 0;
 static u8 mode_page_01[12] = {};
 static bool mode_page_01_set = false;
 
+// One READ_10 fetch, whatever the backing image: CHD, plain cooked file or raw-frame file.
+static bool atapi_read_sectors(u32 lba, u32 nsec, u8* dst) {
+    const u32 secsize = ACATAPI::CONSTANTS::DVD_SECTORSIZE;
+    if (ACATA::TH::isCHD) {
+        u32 scale = secsize / CHD.GetSectorSize();
+        return CHD.ReadSectors((u64)lba * scale, nsec * scale, dst);
+    }
+    if (ACATA::TH::unitbytes == 0) {
+        s64 offset = (s64)lba * secsize;
+        size_t expected = (size_t)nsec * secsize;
+        FileSystem::FSeek64(ACATA::TH::IMAGE, offset, SEEK_SET);
+        return fread(dst, 1, expected, ACATA::TH::IMAGE) == expected;
+    }
+    for (u32 i = 0; i < nsec; i++) {
+        s64 offset = (s64)(lba + i) * ACATA::TH::unitbytes + ACATA::TH::unitdataoff;
+        FileSystem::FSeek64(ACATA::TH::IMAGE, offset, SEEK_SET);
+        if (fread(dst + (size_t)i * secsize, 1, secsize, ACATA::TH::IMAGE) != secsize)
+            return false;
+    }
+    return true;
+}
+
 void ACATAPI::Reset() { mode_page_01_set = false; }
 
 static void atapi_pio_write_setup(u32 len) {
@@ -262,17 +284,7 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
         ACATA_LOG("ATAPI READ_10 lba:%08X sectors:%02X dma:%d", transf_lba, nsec, ACATA_ISDMA);
         if (ACATA_ISDMA) {
             u32 total = nsec * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
-            bool ok = false;
-            if (total <= sizeof(atapi_dma_buf)) {
-                if (ACATA::TH::isCHD) {
-                    u32 scale = ACATAPI::CONSTANTS::DVD_SECTORSIZE / CHD.GetSectorSize();
-                    ok = CHD.ReadSectors((u64)transf_lba * scale, nsec * scale, atapi_dma_buf);
-                } else {
-                    s64 offset = (s64)transf_lba * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
-                    FileSystem::FSeek64(ACATA::TH::IMAGE, offset, SEEK_SET);
-                    ok = (fread(atapi_dma_buf, 1, total, ACATA::TH::IMAGE) == total);
-                }
-            }
+            bool ok = (total <= sizeof(atapi_dma_buf)) && atapi_read_sectors(transf_lba, nsec, atapi_dma_buf);
             if (ok) {
                 atapi_dma_len = total;
                 atapi_complete_nodata();
@@ -291,15 +303,7 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
                 atapi_complete_error();
                 break;
             }
-            bool ok = false;
-            if (ACATA::TH::isCHD) {
-                u32 scale = ACATAPI::CONSTANTS::DVD_SECTORSIZE / CHD.GetSectorSize();
-                ok = CHD.ReadSectors((u64)transf_lba * scale, nsec * scale, atapi_pio_buf);
-            } else {
-                s64 offset = (s64)transf_lba * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
-                FileSystem::FSeek64(ACATA::TH::IMAGE, offset, SEEK_SET);
-                ok = (fread(atapi_pio_buf, 1, total, ACATA::TH::IMAGE) == total);
-            }
+            bool ok = atapi_read_sectors(transf_lba, nsec, atapi_pio_buf);
             if (ok) {
                 atapi_pio_setup(total);
             } else {

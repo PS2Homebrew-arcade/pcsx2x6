@@ -5,6 +5,11 @@
 #include "ImGui/ImGuiManager.h"
 #include "Input/InputManager.h"
 #include "Input/InputSource.h"
+#ifdef _WIN32
+#include "Input/RawInputSource.h"
+#elif defined(__linux__)
+#include "Input/EvdevInputSource.h"
+#endif
 #include "SIO/Pad/Pad.h"
 #include "SIO/Sio.h"
 #include "USB/USB.h"
@@ -702,6 +707,9 @@ static std::array<const char*, static_cast<u32>(InputSourceType::Count)> s_input
 #ifdef _WIN32
 	"DInput",
 	"XInput",
+	"RawInput",
+#elif defined(__linux__)
+	"Evdev",
 #endif
 }};
 
@@ -729,6 +737,9 @@ bool InputManager::GetInputSourceDefaultEnabled(InputSourceType type)
 			return false;
 
 		case InputSourceType::XInput:
+			return false;
+
+		case InputSourceType::RawInput:
 			return false;
 #endif
 
@@ -1255,6 +1266,11 @@ bool InputManager::IsAxisHandler(const InputEventHandler& handler)
 
 bool InputManager::InvokeEvents(InputBindingKey key, float value, GenericInputBinding generic_key)
 {
+	// When RawInput is active, suppress all Pointer button events.
+	// These are duplicates of the per-device RawMouse events from the lightgun.
+	if (key.source_type == InputSourceType::Pointer && key.source_subtype == InputSubclass::PointerButton && IsUsingRawInput())
+		return false;
+
 	if (key.source_type == InputSourceType::Pointer && key.source_subtype == InputSubclass::PointerButton &&
 		key.source_index < MAX_POINTER_DEVICES && key.data < 32)
 	{
@@ -1525,6 +1541,55 @@ void InputManager::GenerateRelativeMouseEvents()
 			}
 		}
 	}
+}
+
+#ifdef _WIN32
+static RawInputSource* GetActiveRawInputSource()
+{
+	InputSource* source = InputManager::GetInputSourceInterface(InputSourceType::RawInput);
+	return (source && source->IsInitialized()) ? static_cast<RawInputSource*>(source) : nullptr;
+}
+#elif defined(__linux__)
+static EvdevInputSource* GetActiveEvdevSource()
+{
+	InputSource* source = InputManager::GetInputSourceInterface(InputSourceType::Evdev);
+	return (source && source->IsInitialized()) ? static_cast<EvdevInputSource*>(source) : nullptr;
+}
+#endif
+
+bool InputManager::IsUsingRawInput()
+{
+#ifdef _WIN32
+	return GetActiveRawInputSource() != nullptr;
+#elif defined(__linux__)
+	return GetActiveEvdevSource() != nullptr;
+#else
+	return false;
+#endif
+}
+
+std::optional<u32> InputManager::GetPointerIndexForRawDevice(const std::string_view device_path)
+{
+#ifdef _WIN32
+	if (RawInputSource* source = GetActiveRawInputSource())
+		return source->GetPointerIndexForDevicePath(device_path);
+#elif defined(__linux__)
+	if (EvdevInputSource* source = GetActiveEvdevSource())
+		return source->GetPointerIndexForIdentity(device_path);
+#endif
+	return std::nullopt;
+}
+
+std::vector<std::pair<std::string, std::string>> InputManager::EnumerateRawPointerDevices()
+{
+#ifdef _WIN32
+	if (RawInputSource* source = GetActiveRawInputSource())
+		return source->GetRawMouseDeviceList();
+#elif defined(__linux__)
+	if (EvdevInputSource* source = GetActiveEvdevSource())
+		return source->GetPointerDeviceList();
+#endif
+	return {};
 }
 
 std::pair<float, float> InputManager::GetPointerAbsolutePosition(u32 index)
@@ -1992,6 +2057,7 @@ void InputManager::UpdateInputSourceState(SettingsInterface& si, std::unique_loc
 #ifdef _WIN32
 #include "Input/DInputSource.h"
 #include "Input/XInputSource.h"
+#include "Input/RawInputSource.h"
 #endif
 
 void InputManager::ReloadSources(SettingsInterface& si, std::unique_lock<std::mutex>& settings_lock)
@@ -2000,5 +2066,8 @@ void InputManager::ReloadSources(SettingsInterface& si, std::unique_lock<std::mu
 #ifdef _WIN32
 	UpdateInputSourceState<DInputSource>(si, settings_lock, InputSourceType::DInput);
 	UpdateInputSourceState<XInputSource>(si, settings_lock, InputSourceType::XInput);
+	UpdateInputSourceState<RawInputSource>(si, settings_lock, InputSourceType::RawInput);
+#elif defined(__linux__)
+	UpdateInputSourceState<EvdevInputSource>(si, settings_lock, InputSourceType::Evdev);
 #endif
 }

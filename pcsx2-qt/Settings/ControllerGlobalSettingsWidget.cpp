@@ -52,6 +52,7 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 #ifdef _WIN32
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableXInputSource, "InputSources", "XInput", false);
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableDInputSource, "InputSources", "DInput", false);
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableRawInputSource, "InputSources", "RawInput", false);
 #else
 	m_ui.mainLayout->removeWidget(m_ui.xinputGroup);
 	m_ui.xinputGroup->deleteLater();
@@ -59,6 +60,18 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 	m_ui.mainLayout->removeWidget(m_ui.dinputGroup);
 	m_ui.dinputGroup->deleteLater();
 	m_ui.dinputGroup = nullptr;
+#ifdef __linux__
+	m_ui.rawinputGroup->setTitle(tr("Evdev Input Source"));
+	m_ui.label_rawinput->setText(tr("The Evdev source enables per-device tracking for absolute positioning devices (e.g.: light guns). "
+									"When enabled, each device is tracked independently, allowing multi-player support with separate input per port. "
+									"Aimed devices are grabbed exclusively while a game runs, keeping them off the desktop cursor."));
+	m_ui.enableRawInputSource->setText(tr("Enable Evdev Input Source"));
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, m_ui.enableRawInputSource, "InputSources", "Evdev", false);
+#else
+	m_ui.mainLayout->removeWidget(m_ui.rawinputGroup);
+	m_ui.rawinputGroup->deleteLater();
+	m_ui.rawinputGroup = nullptr;
+#endif
 #endif
 
 	if (dialog->isEditingProfile())
@@ -84,6 +97,11 @@ ControllerGlobalSettingsWidget::ControllerGlobalSettingsWidget(QWidget* parent, 
 }
 
 ControllerGlobalSettingsWidget::~ControllerGlobalSettingsWidget() = default;
+
+void ControllerGlobalSettingsWidget::clearDeviceList()
+{
+	m_ui.deviceList->clear();
+}
 
 void ControllerGlobalSettingsWidget::addDeviceToList(const QString& identifier, const QString& name)
 {

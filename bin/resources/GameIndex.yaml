@@ -7,6 +7,7 @@ NM00001:
   clampModes:
     vuClampMode: 2
   gsHWFixes:
+    alignSprite: 1
     textureInsideRT: 1
     halfPixelOffset: 2
     roundSprite: 1
@@ -37,6 +38,8 @@ NM00004:
   bootprog: TK4LOAD
   media: DVD
   input: button
+  gsHWFixes:
+    alignSprite: 1
 NM00005:
   name: Wangan Midnight R
   region: System246
@@ -151,7 +154,7 @@ NM00021:
   input: lightgun
 NM00022:
   name: The IDOLM@STER
-  region: System246
+  region: System256
   bootprog: IDLLOAD
   media: HDD
   input: touchscreen
@@ -236,7 +239,7 @@ NM00033:
     alignSprite: 1 # Fixes vertical lines.
 NM00034:
   name: Mobile Suit Gundam SEED Destiny - Federation vs. Z.A.F.T. II
-  region: System256
+  region: System246
   bootprog: SE2LOAD
   media: DVD
   input: button

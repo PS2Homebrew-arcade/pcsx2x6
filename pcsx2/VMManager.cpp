@@ -1441,11 +1441,7 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 						return false;
 					}
 					Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", card.c_str());
-				}
-				/// TODOx6: Decide if we want to lock mc1 access if .ACGAME does not ask for it
-				//   Only SoulCalibur2 uses it, with the conquest card. yet many games bring a DONGLEMAN that can still access both ports
-				//   It SHOULD not be possible: but What if A game with the appropiate dongleman driver damages a conquest card?
-				// ---> else Host::SetBaseBoolSettingValue("MemoryCards", "Slot2_Enable", false);
+				} else Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", "");
 
 				//FileMcd_Reopen(s_serial);
 				s_elf_override = Path::Combine(basedir, INI.GetStringValue("data", "elf", "boot.elf"));
@@ -1477,7 +1473,8 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
 				int R;
 				if ((R = ACATA::TH::IO_OpenImage())!=0) {
-					Error::SetStringFmt(error, "cannot open arcade media image {}", ACATA::imgpath);
+					Error::SetString(error, ACATA::TH::open_error.empty() ?
+						std::string("cannot open arcade media image") : ACATA::TH::open_error);
 					return false;
 				}
 				if (s_acmedia == "CD" && !ACATA::imgpath.empty()) {

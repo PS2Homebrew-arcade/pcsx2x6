@@ -19,7 +19,9 @@
 #include <QtCore/QEvent>
 #include <QtGui/QAction>
 #include <QtGui/QCursor>
+#include <QtGui/QKeyEvent>
 #include <QtGui/QShowEvent>
+#include <QtWidgets/QApplication>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
@@ -653,18 +655,30 @@ static void populateAimCombo(QComboBox* combo, ControllerSettingsWindow* dialog,
 {
 	combo->blockSignals(true);
 	combo->clear();
-	for (u32 j = 0; j < InputManager::MAX_POINTER_DEVICES; j++)
+	// with RawInput, one entry per mouse; otherwise the single merged system pointer
+	const auto raw_mice = InputManager::EnumerateRawPointerDevices();
+	if (raw_mice.empty())
 	{
-		const QString name = (InputManager::MAX_POINTER_DEVICES == 1)
-			? JVSControlsWidget::tr("Mouse (system)") : QString::fromStdString(InputManager::GetPointerDeviceName(j));
-		combo->addItem(name, QString::fromStdString(InputManager::GetPointerDeviceName(j)));
+		combo->addItem(JVSControlsWidget::tr("Mouse (system)"), QString::fromStdString(InputManager::GetPointerDeviceName(0)));
+	}
+	else
+	{
+		for (const auto& [vidpid, display_name] : raw_mice)
+		{
+			const std::optional<u32> idx = InputManager::GetPointerIndexForRawDevice(vidpid);
+			if (idx.has_value())
+				combo->addItem(QString::fromStdString(display_name), QString::fromStdString(InputManager::GetPointerDeviceName(idx.value())));
+		}
 	}
 	for (const QPair<QString, QString>& dev : dialog->getDeviceList())
 	{
 		// Skip the "Mouse"/"Keyboard" pseudo-devices: no aim stick, and the mouse is already the pointer above.
 		if (dev.first == QLatin1String("Mouse") || dev.first == QLatin1String("Keyboard"))
 			continue;
-		combo->addItem(dev.second, dev.first);
+		// Raw mice are already listed above with their pointer slot.
+		if (dev.first.startsWith(QLatin1String("RawMouse-")) || dev.first.startsWith(QLatin1String("EvdevMouse-")))
+			continue;
+		combo->addItem(JVSControlsWidget::tr("%1 (Stick)").arg(dev.second), dev.first);
 	}
 	const int idx = combo->findData(current);
 	combo->setCurrentIndex((idx >= 0) ? idx : 0);
@@ -749,11 +763,27 @@ void JVSControlsWidget::buildLightgunPage()
 	};
 	makeAimCombo(1, "USB1");
 	makeAimCombo(2, "USB2");
+	QPushButton* refreshBtn = new QPushButton(tr("Refresh"), aimGroup);
+	connect(refreshBtn, &QPushButton::clicked, this, []() {
+		g_emu_thread->reloadInputDevices();
+		g_emu_thread->enumerateInputDevices(); // queued after the re-scan; onInputDevicesEnumerated repopulates the combos
+	});
+	ag->addWidget(refreshBtn, 1, 3);
+#if defined(_WIN32) || defined(__linux__)
+	m_rawInputStatus = new QLabel(aimGroup);
+	ag->addWidget(m_rawInputStatus, 2, 0, 1, 4);
+#endif
 	refreshAimDevices();
 	ag->setColumnStretch(0, 1);
+	QGroupBox* cabinet = new QGroupBox(tr("Cabinet settings"), this);
+	QVBoxLayout* cl = new QVBoxLayout(cabinet);
+	QCheckBox* link2p = new QCheckBox(tr("Link as 2P (right side)"), cabinet);
+	ControllerSettingWidgetBinder::BindWidgetToInputProfileBool(sif, link2p, ACJV::CONFIG_SECTION, "LightgunLinkAs2P", false);
+	cl->addWidget(link2p);
+	cl->addStretch(1);
 	QHBoxLayout* top = new QHBoxLayout();
 	top->addWidget(aimGroup, 1);
-	top->addStretch(1);
+	top->addWidget(cabinet, 1);
 	m_ui.lightgunPageLayout->addLayout(top);
 
 	QGroupBox* group = new QGroupBox(tr("Light gun buttons"), this);
@@ -904,10 +934,75 @@ void JVSControlsWidget::buildTouchPage()
 	m_ui.touchPageLayout->addStretch(1);
 }
 
+namespace
+{
+// Community easter egg: press 3 three times on the Standard page to light up "Button 3".
+class Button3Egg final : public QObject
+{
+public:
+	Button3Egg(QLabel* label, QWidget* page)
+		: QObject(label)
+		, m_label(label)
+		, m_page(page)
+	{
+		qApp->installEventFilter(this);
+	}
+
+protected:
+	bool eventFilter(QObject*, QEvent* event) override
+	{
+		if (event->type() != QEvent::KeyPress)
+			return false;
+		const QKeyEvent* ke = static_cast<QKeyEvent*>(event);
+		// An app-level filter sees the same key event once per widget it propagates through.
+		if (ke->key() != Qt::Key_3 || ke->isAutoRepeat() || ke->timestamp() == m_last_press ||
+			m_timer != 0 || !m_page->isVisible())
+			return false;
+		m_presses = (ke->timestamp() - m_last_press > 1200) ? 1 : m_presses + 1;
+		m_last_press = ke->timestamp();
+		if (m_presses == 3)
+			m_timer = startTimer(50);
+		return false;
+	}
+
+	void timerEvent(QTimerEvent*) override
+	{
+		if (!m_page->isVisible())
+		{
+			killTimer(m_timer);
+			m_timer = 0;
+			m_presses = 0;
+			m_label->setStyleSheet(QString());
+			return;
+		}
+		m_hue = (m_hue + 10) % 360;
+		m_label->setStyleSheet(
+			QStringLiteral("color: %1; font-weight: bold;").arg(QColor::fromHsv(m_hue, 255, 255).name()));
+	}
+
+private:
+	QLabel* m_label;
+	QWidget* m_page;
+	quint64 m_last_press = 0;
+	int m_presses = 0;
+	int m_timer = 0;
+	int m_hue = 0;
+};
+} // namespace
+
 void JVSControlsWidget::buildStandardPage()
 {
 	buildJvsLayoutPage(this, m_dialog->getProfileSettingsInterface(), m_dialog,
 		m_ui.standardPageLayout, ACJV::GetStandardLayouts());
+
+	for (QLabel* label : m_ui.standardPage->findChildren<QLabel*>())
+	{
+		if (label->text() == QStringLiteral("Button 3"))
+		{
+			new Button3Egg(label, m_ui.standardPage);
+			return;
+		}
+	}
 }
 
 // (Re)fill the lightgun Aim Device combos; devices enumerate asynchronously, so this reruns on show.
@@ -925,6 +1020,17 @@ void JVSControlsWidget::refreshAimDevices()
 	{
 		populateAimCombo(m_touchAimCombo, m_dialog, QString::fromStdString(m_dialog->getStringValue(
 			ACJV::CONFIG_SECTION, "TouchPointer", InputManager::GetPointerDeviceName(0).c_str())));
+	}
+	if (m_rawInputStatus)
+	{
+#ifdef _WIN32
+		const QString label = tr("Raw Input:");
+#else
+		const QString label = tr("Evdev:");
+#endif
+		m_rawInputStatus->setText(InputManager::IsUsingRawInput()
+			? QStringLiteral("%1 <b><span style='color:#2ecc71;'>ON</span></b>").arg(label)
+			: QStringLiteral("%1 <b>OFF</b>").arg(label));
 	}
 }
 

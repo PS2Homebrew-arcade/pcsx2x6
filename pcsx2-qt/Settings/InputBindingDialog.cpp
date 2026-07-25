@@ -85,8 +85,12 @@ bool InputBindingDialog::eventFilter(QObject* watched, QEvent* event)
 	else if (event_type == QEvent::MouseButtonPress || event_type == QEvent::MouseButtonDblClick)
 	{
 		// double clicks get triggered if we click bind, then click again quickly.
-		if (const u32 button_mask = static_cast<u32>(static_cast<const QMouseEvent*>(event)->button()))
-			m_new_bindings.push_back(InputManager::MakePointerButtonKey(0, std::countr_zero(button_mask)));
+		// with RawInput active, buttons arrive as per-device RawMouse events instead
+		if (!InputManager::IsUsingRawInput())
+		{
+			if (const u32 button_mask = static_cast<u32>(static_cast<const QMouseEvent*>(event)->button()))
+				m_new_bindings.push_back(InputManager::MakePointerButtonKey(0, std::countr_zero(button_mask)));
+		}
 		return true;
 	}
 	else if (event_type == QEvent::Wheel)
@@ -285,6 +289,19 @@ void InputBindingDialog::saveListToSettings()
 	}
 }
 
+// Composite devices report one press through several sources at once (e.g. a touchpad click also
+// arriving as a gamepad button); during capture the per-device pointer event wins over duplicates.
+static bool IsPerDevicePointerKey(InputBindingKey key)
+{
+#ifdef _WIN32
+	return key.source_type == InputSourceType::RawInput;
+#elif defined(__linux__)
+	return key.source_type == InputSourceType::Evdev;
+#else
+	return false;
+#endif
+}
+
 void InputBindingDialog::inputManagerHookCallback(InputBindingKey key, float value)
 {
 	if (!isListeningForInput())
@@ -331,6 +348,10 @@ void InputBindingDialog::inputManagerHookCallback(InputBindingKey key, float val
 	// new binding, add it to the list, but wait for a decent distance first, and then wait for release
 	if ((reverse_threshold ? (abs_value < 0.5f) : (abs_value >= 0.5f)))
 	{
+		if (IsPerDevicePointerKey(key))
+			std::erase_if(m_new_bindings, [](const InputBindingKey& k) { return !IsPerDevicePointerKey(k); });
+		else if (std::any_of(m_new_bindings.begin(), m_new_bindings.end(), IsPerDevicePointerKey))
+			return;
 		InputBindingKey key_to_add = key;
 		key_to_add.modifier = (value < 0.0f && !reverse_threshold) ? InputModifier::Negate : InputModifier::None;
 		key_to_add.invert = reverse_threshold;
