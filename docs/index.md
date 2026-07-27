@@ -20,15 +20,12 @@
 </div>
 </div>
 
-!!! warning "WIP Project"
+This is a modification of the popular PS2 emulator PCSX2  
+It's main purpose is to emulate the namco SYSTEM246 and SYSTEM256 arcade family. which are based on the official sony PlayStation2 COH-H models, a special division of ps2 motherboards based on the Retail USA release model.
 
-	This project is on development, news and releases may appear at the bottom of this page when avaiable!
+PCSX2x6 does not require MagicGate or any form of security.
 
-
-???+ note "Looking for collaborators!"
-
-    this is my first time working on any kind of emulator software, some stuff like ATA/ATAPI are quite annoying/unintuitive to deal with... any kind of help would be appreciated!
-
+User only needs to dump their game security dongle (COH-H10020 memory card), which contains the game software, as well as the game CD/DVD/HardDrive, which contains the game data
 
 ---
 ## Additional utilities
