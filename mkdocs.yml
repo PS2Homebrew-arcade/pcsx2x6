@@ -1,6 +1,7 @@
 site_name: PCSX2x6 - SYSTEM246 Emulator
 site_url: https://PS2Homebrew-arcade.github.io/PCSX2x6/
 theme:
+  favicon: img/AppIconLarge.png
   custom_dir: overrides
   extra_css:
     - stylesheets/extra.css
