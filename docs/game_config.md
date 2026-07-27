@@ -120,6 +120,7 @@ and inside the file I only declare
 gameid=NM00027
 ```
 you would only need to:
+
 - put the disc image in `C:\GAMES\SYSTEM2x6\NM00027\NM00027.chd`
 - put the dongle on the memcards folder of PCSX2x6, named as `NM00027.ps2`
 

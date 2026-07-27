@@ -32,4 +32,4 @@
 
 ---
 ## Additional utilities
-[game library template](https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.0.10/system2x6_template_gamelibrary.7z){ .md-button }
+[game library template](https://github.com/PS2Homebrew-arcade/pcsx2x6/releases/download/v0.2.20/game_library_template.7z){ .md-button }
