@@ -697,8 +697,8 @@ static constexpr float GUN_CAM_VISIBLE_X = 230.0f / 320.0f;
 static constexpr float GUN_CAM_VISIBLE_Y = 140.0f / 224.0f;
 static u16 s_gunRawX[JVS_PLAYER_COUNT] = {0xFFFF, 0xFFFF};
 static u16 s_gunRawY[JVS_PLAYER_COUNT] = {0xFFFF, 0xFFFF};
-static bool s_gunForceOff = false;
-void ACJV::SetGunForceOffscreen(bool held) { s_gunForceOff = held; }
+static bool s_gunForceOff[JVS_PLAYER_COUNT] = {};
+void ACJV::SetGunForceOffscreen(u32 player, bool held) { if (player < JVS_PLAYER_COUNT) s_gunForceOff[player] = held; }
 static float s_gunContour = 0.01f;
 void ACJV::SetGunOffscreenContour(float fraction) { s_gunContour = std::clamp(fraction, 0.0f, 0.05f); }
 
@@ -728,7 +728,7 @@ static void UpdateLightgunFromMouse()
 			// aiming beside the screen, so the native reload (invalid position -> reloadExe) stays reachable.
 			const float contour = s_gunContour;
 			const bool in_aim_area = (dx >= contour && dx <= 1.0f - contour && dy >= contour && dy <= 1.0f - contour);
-			const bool lost = s_gunForceOff || !in_aim_area || (fx < 0.0f || fx > 1.0f || fy < 0.0f || fy > 1.0f);
+			const bool lost = s_gunForceOff[p] || !in_aim_area || (fx < 0.0f || fx > 1.0f || fy < 0.0f || fy > 1.0f);
 			s_gunRawX[p] = lost ? 0xFFFF : static_cast<u16>(std::clamp(fx * 65535.0f, 1.0f, 65534.0f));
 			s_gunRawY[p] = lost ? 0xFFFF : static_cast<u16>(std::clamp(fy * 65535.0f, 1.0f, 65534.0f));
 			if (s_gunRawX[p] == 0x7FFF) s_gunRawX[p] = 0x7FFE; //0x7FFF is skipped by the game's adjust sampler
