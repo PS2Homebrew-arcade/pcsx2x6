@@ -172,6 +172,30 @@
     - any-glob-to-any-file:
       - 'pcsx2/DEV9/*'
       - 'pcsx2/DEV9/**/*'
+'ACUART':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pcsx2/DEV9/*ACUART*.*'
+'ACATA':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pcsx2/DEV9/*ACATA*.*'
+'JVS':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pcsx2/DEV9/*ACJV*.*'
+'ACCORE':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pcsx2/DEV9/*ACCORE*.*'
+'ACRAM':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pcsx2/DEV9/*ACRAM*.*'
+'ACSRAM':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pcsx2/DEV9/*ACSRAM*.*'
 'IPU':
   - changed-files:
     - any-glob-to-any-file:
