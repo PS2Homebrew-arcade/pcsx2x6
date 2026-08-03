@@ -17,7 +17,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         debug-mode: false
         pr-message: |-
-          ## Thank you for submitting a contribution to PCSX2
+          ## Thank you for submitting a contribution to PCSX2x6
 
           As this is your first pull request, [please be aware of the contributing guidelines](https://github.com/PS2Homebrew-arcade/pcsx2x6/blob/master/CONTRIBUTING.md).
 

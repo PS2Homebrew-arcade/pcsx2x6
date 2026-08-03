@@ -178,6 +178,7 @@
     <ClCompile Include="DEV9\ACATAPI.cpp" />
     <ClCompile Include="DEV9\ACJV.cpp" />
     <ClCompile Include="DEV9\ACUART.cpp" />
+    <ClCompile Include="DEV9\ACUART_GLUE.cpp" />
     <ClCompile Include="DEV9\ACCORE.cpp" />
     <ClCompile Include="DEV9\flash.cpp" />
     <ClCompile Include="DEV9\InternalServers\DHCP_Logger.cpp" />

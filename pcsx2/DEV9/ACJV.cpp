@@ -616,7 +616,7 @@ void ACJV::SetGameId(const std::string& gameid)
 {
 	s_gameid = gameid;
 	// Clean slate: zero all input state on game switch within the emulator
-	ACUART::ResetBg3State(); // re-arm the BG3 acuart HANDLE handshake so a game RESET boots cleanly (no HANDLE ERROR)
+	ACUART::SetupGameHandler(gameid);
 	ACJV::coin[0] = 0;
 	ACJV::coin[1] = 0;
 	m_jvsButtonState[0] = 0;
