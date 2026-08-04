@@ -33,6 +33,7 @@ theme:
       accent: red
 
 markdown_extensions:
+  - material.extensions.preview
   - footnotes
   - pymdownx.critic
   - attr_list

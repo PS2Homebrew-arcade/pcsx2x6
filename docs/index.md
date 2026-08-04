@@ -16,7 +16,7 @@
 [:fontawesome-brands-github: download latest nightly](https://github.com/PS2Homebrew-arcade/pcsx2x6/releases){ .md-button style="display:block" }
 [:fontawesome-brands-github: report an issue](https://github.com/PS2Homebrew-arcade/pcsx2x6/issues/new/choose){ .md-button style="display:block" }
 [:fontawesome-brands-discord: Discord Server](https://discord.gg/ghpjzNX7pH){ .md-button style="display:block" }
-
+[:octicons-question-16: Frequent Questions](./FAQ.md){ .md-button style="display:block" }
 </div>
 </div>
 
