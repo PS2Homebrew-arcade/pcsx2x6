@@ -1306,9 +1306,45 @@ namespace R3000A
 
 	namespace sifcmd
 	{
+		std::map<u32,std::string> rpcservice_map = {
+			// SYSTEM2x6 std IRX
+			{0x76500003,	"ACJV"},
+			{0x76500001,	"ACMEME"},
+			{0x76500002,	"ACCDVDE"},
+			{0xFFFF,		"ACRTC"},
+			// system2x6 game specific
+			{0x6502,		"UARTMAN (IDOLM@STER card reader)"},
+			{0x76500004,	"ACNSWE (RRV Force feedback motor)"},
+			{0x1000,		"SSM (Bloody Roar 3 audio core)"},
+			
+			// sony std IRX
+			{0x80000001,	"FILEIO"},
+			{0x80000003,	"FILEIO (Heap alloc)"},
+			{0x80000006,	"LOADFILE"},
+			{0x80000100,	"PADMAN"},
+			{0x80000101,	"PADMAN (extension)"},
+			{0x80000400,	"MCSERV"},
+			{0x80000592,	"CDVDFSV (init)"},
+			{0x80000593,	"CDVDFSV (CDVD S commands)"},
+			{0x80000595,	"CDVDFSV (CDVD N commands)"},
+			{0x80000597,	"CDVDFSV (CDVD SearchFile)"},
+			{0x8000059A,	"CDVDFSV (CDVD Disk Ready)"},
+			{0x80000701,	"SDRDRV"},
+			{0x80000901,	"MTAPMAN Port Open"},
+			{0x80000902,	"MTAPMAN Port Close"},
+			{0x80000903,	"MTAPMAN Get Connection"},
+			{0x80000904,	"MTAPMAN"},
+			{0x80000905,	"MTAPMAN"},
+			{0x80001400,	"EYETOY"},
+		};
 		void sceSifRegisterRpc_DEBUG()
 		{
-			DevCon.WriteLn(Color_Gray, "IOP: sceSifRegisterRpc server_id=%08X", a1);
+
+    		auto it = rpcservice_map.find(a1);
+    		if (it != rpcservice_map.end())
+    		    DevCon.WriteLn(Color_Gray, "IOP: sceSifRegisterRpc server_id=%08X alias:'%s'", a1, it->second.c_str());
+    		else
+        		DevCon.WriteLn(Color_Gray, "IOP: sceSifRegisterRpc server_id=%08X (unknown)", a1);
 		}
 	} // namespace sifcmd
 

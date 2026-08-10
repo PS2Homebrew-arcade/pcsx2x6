@@ -1172,9 +1172,9 @@ void DEV9writeDMA8Mem(u32* pMem, int size)
 
 void DEV9async(u32 cycles)
 {
-	smap_async(cycles);
-	dev9.ata->Async(cycles);
-	ACUART::StreamV257(cycles); // Ridge Racer V self-test: stream the V257 drive-board status...
+	//smap_async(cycles);
+	//dev9.ata->Async(cycles);
+	if (ACUART::s_device) ACUART::s_device->Tick(cycles);
 	ACJV::UpdateFcaFrame();     // ...and free-run the FCA-1 input frame
 }
 
