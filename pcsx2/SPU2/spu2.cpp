@@ -119,7 +119,7 @@ void SPU2::CreateOutputStream()
 
 	Error error;
 	s_output_stream = AudioStream::CreateStream(EmuConfig.SPU2.Backend, sample_rate, EmuConfig.SPU2.StreamParameters,
-		EmuConfig.SPU2.DriverName.c_str(), EmuConfig.SPU2.DeviceName.c_str(), EmuConfig.SPU2.IsTimeStretchEnabled(), &error);
+		EmuConfig.SPU2.DriverName.c_str(), EmuConfig.SPU2.DeviceName.c_str(), EmuConfig.SPU2.SyncMode, &error);
 	if (!s_output_stream)
 	{
 		Host::ReportErrorAsync("Error",
@@ -131,6 +131,7 @@ void SPU2::CreateOutputStream()
 
 	SPU2::UpdateOutputVolume();
 	s_output_stream->SetNominalRate(GetNominalRate());
+	s_output_stream->SetTargetSpeed(VMManager::GetTargetSpeed());
 	s_output_stream->SetPaused(VMManager::GetState() == VMState::Paused);
 }
 
@@ -256,13 +257,14 @@ void SPU2::OnTargetSpeedChanged()
 	if (!s_output_stream)
 		return;
 
-	if (!s_output_stream->IsStretchEnabled())
+	if (s_output_stream->GetSynchronizationMode() == AudioSynchronizationMode::Disabled)
 	{
 		s_output_stream->EmptyBuffer();
 		s_current_chunk_pos = 0;
 	}
 
 	s_output_stream->SetNominalRate(GetNominalRate());
+	s_output_stream->SetTargetSpeed(VMManager::GetTargetSpeed());
 
 	// Flipped save as speed has already changed.
 	if (!s_output_muted)
@@ -358,9 +360,9 @@ void SPU2::CheckForConfigChanges(const Pcsx2Config& old_config)
 	{
 		CreateOutputStream();
 	}
-	else if (opts.IsTimeStretchEnabled() != old_opts.IsTimeStretchEnabled())
+	else if (opts.SyncMode != old_opts.SyncMode)
 	{
-		s_output_stream->SetStretchEnabled(opts.IsTimeStretchEnabled());
+		s_output_stream->SetSynchronizationMode(opts.SyncMode);
 	}
 
 #ifdef PCSX2_DEVBUILD
@@ -479,7 +481,12 @@ s32 SPU2freeze(FreezeAction mode, freezeData* data)
 	switch (mode)
 	{
 		case FreezeAction::Load:
-			return SPU2Savestate::ThawIt(spud);
+		{
+			const s32 result = SPU2Savestate::ThawIt(spud);
+			if (result == 0 && s_output_stream)
+				s_output_stream->ResetForSavestateLoad();
+			return result;
+		}
 		case FreezeAction::Save:
 			return SPU2Savestate::FreezeIt(spud);
 
