@@ -60,6 +60,8 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/AdvancedSettingsWidget.h
 	Settings/AdvancedSettingsWidget.ui
 	Settings/AudioExpansionSettingsDialog.ui
+	Settings/AudioLatencySlider.cpp
+	Settings/AudioLatencySlider.h
 	Settings/AudioSettingsWidget.cpp
 	Settings/AudioSettingsWidget.h
 	Settings/AudioSettingsWidget.ui

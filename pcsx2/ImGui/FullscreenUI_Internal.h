@@ -422,7 +422,9 @@ namespace FullscreenUI
 		std::pair<ImFont*, float> summary_font = g_medium_font);
 	void DrawIntRangeSetting(SettingsInterface* bsi, const char* title, const char* summary, const char* section, const char* key,
 		int default_value, int min_value, int max_value, const char* format = "%d", bool enabled = true,
-		float height = ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT, std::pair<ImFont*, float> font = g_large_font, std::pair<ImFont*, float> summary_font = g_medium_font);
+		float height = ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT, std::pair<ImFont*, float> font = g_large_font,
+		std::pair<ImFont*, float> summary_font = g_medium_font, std::optional<int> marker_value = std::nullopt,
+		const char* marker_label = nullptr, const char* below_marker_message = nullptr);
 	void DrawIntSpinBoxSetting(SettingsInterface* bsi, const char* title, const char* summary, const char* section, const char* key,
 		int default_value, int min_value, int max_value, int step_value, const char* format = "%d", bool enabled = true,
 		float height = ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT, std::pair<ImFont*, float> font = g_large_font, std::pair<ImFont*, float> summary_font = g_medium_font);
