@@ -58,6 +58,10 @@ winmm_init(cubeb ** context, char const * context_name);
 #if defined(USE_WASAPI)
 int
 wasapi_init(cubeb ** context, char const * context_name);
+int
+iaudioclient3_init(cubeb ** context, char const * context_name);
+int
+wasapi_exclusive_init(cubeb ** context, char const * context_name);
 #endif
 #if defined(USE_SNDIO)
 int
@@ -175,6 +179,14 @@ cubeb_init(cubeb ** context, char const * context_name,
     } else if (!strcmp(backend_name, "wasapi")) {
 #if defined(USE_WASAPI)
       init_oneshot = wasapi_init;
+#endif
+    } else if (!strcmp(backend_name, "iaudioclient3")) {
+#if defined(USE_WASAPI)
+      init_oneshot = iaudioclient3_init;
+#endif
+    } else if (!strcmp(backend_name, "wasapi-exclusive")) {
+#if defined(USE_WASAPI)
+      init_oneshot = wasapi_exclusive_init;
 #endif
     } else if (!strcmp(backend_name, "winmm")) {
 #if defined(USE_WINMM)
@@ -322,6 +334,8 @@ cubeb_get_backend_names()
 #endif
 #if defined(USE_WASAPI)
     "wasapi",
+    "iaudioclient3",
+    "wasapi-exclusive",
 #endif
 #if defined(USE_WINMM)
     "winmm",
