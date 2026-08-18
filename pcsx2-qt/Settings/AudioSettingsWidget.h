@@ -24,9 +24,9 @@ private Q_SLOTS:
 
 	void updateDriverNames();
 	void updateDeviceNames();
+	void onOutputDeviceChanged(int index);
 	void updateLatencyLabel();
 	void updateVolumeLabel();
-	void onMinimalOutputLatencyChanged();
 	void onStandardVolumeChanged(const int new_value);
 	void onFastForwardVolumeChanged(const int new_value);
 	void onOutputMutedChanged(const int new_state);
@@ -38,8 +38,10 @@ private:
 	AudioBackend getEffectiveBackend() const;
 	AudioExpansionMode getEffectiveExpansionMode() const;
 	u32 getEffectiveExpansionBlockSize() const;
+	u32 getMinimumOutputLatencyMS() const;
+	bool isLowLatencyMode() const;
 	void resetVolume(const bool fast_forward);
 
 	Ui::AudioSettingsWidget m_ui;
-	u32 m_output_device_latency = 0;
+	u32 m_minimum_output_latency_frames = 0;
 };

@@ -15,6 +15,7 @@
 #include "Input/InputManager.h"
 #include "MTGS.h"
 #include "Patch.h"
+#include "SPU2/spu2.h"
 #include "USB/USB.h"
 #include "VMManager.h"
 #include "ps2/BiosTools.h"
@@ -572,7 +573,9 @@ void FullscreenUI::DrawIntListSetting(SettingsInterface* bsi, const char* title,
 }
 
 void FullscreenUI::DrawIntRangeSetting(SettingsInterface* bsi, const char* title, const char* summary, const char* section, const char* key,
-	int default_value, int min_value, int max_value, const char* format, bool enabled, float height, std::pair<ImFont*, float> font, std::pair<ImFont*, float> summary_font)
+	int default_value, int min_value, int max_value, const char* format, bool enabled, float height, std::pair<ImFont*, float> font,
+	std::pair<ImFont*, float> summary_font, std::optional<int> marker_value, const char* marker_label,
+	const char* below_marker_message)
 {
 	const bool game_settings = IsEditingGameSettings(bsi);
 	const std::optional<int> value =
@@ -583,7 +586,7 @@ void FullscreenUI::DrawIntRangeSetting(SettingsInterface* bsi, const char* title
 	if (MenuButtonWithValue(title, summary, value_text.c_str(), enabled, height, font, summary_font))
 		ImGui::OpenPopup(title);
 
-	ImGui::SetNextWindowSize(LayoutScale(500.0f, 192.0f));
+	ImGui::SetNextWindowSize(LayoutScale(500.0f, marker_value.has_value() ? 280.0f : 192.0f));
 	ImGui::SetNextWindowPos(ImGui::GetIO().DisplaySize * 0.5f, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
 	ImGui::PushFont(g_large_font.first, g_large_font.second);
@@ -622,9 +625,43 @@ void FullscreenUI::DrawIntRangeSetting(SettingsInterface* bsi, const char* title
 
 			SetSettingsChanged(bsi);
 		}
+		if (marker_value.has_value() && max_value > min_value && marker_value.value() >= min_value &&
+			marker_value.value() <= max_value)
+		{
+			const ImVec2 slider_min = ImGui::GetItemRectMin();
+			const ImVec2 slider_max = ImGui::GetItemRectMax();
+			const float marker_fraction = static_cast<float>(marker_value.value() - min_value) /
+			                              static_cast<float>(max_value - min_value);
+			const float grab_padding = 2.0f;
+			const float slider_size = slider_max.x - slider_min.x - (grab_padding * 2.0f);
+			const float grab_size = std::min(
+				std::max(slider_size / static_cast<float>(max_value - min_value + 1), ImGui::GetStyle().GrabMinSize),
+				slider_size);
+			const float marker_min = slider_min.x + grab_padding + (grab_size * 0.5f);
+			const float marker_max = slider_max.x - grab_padding - (grab_size * 0.5f);
+			const float marker_x = marker_min + ((marker_max - marker_min) * marker_fraction);
+			ImGui::GetWindowDrawList()->AddLine(ImVec2(marker_x, slider_min.y), ImVec2(marker_x, slider_max.y),
+				ImGui::GetColorU32(ImVec4(1.0f, 0.75f, 0.25f, 1.0f)), LayoutScale(3.0f));
+		}
 
 		ImGui::PopStyleColor(7);
 		ImGui::PopStyleVar(3);
+		if (marker_label)
+		{
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + LayoutScale(8.0f));
+			ImGui::PushTextWrapPos(0.0f);
+			if (below_marker_message && marker_value.has_value() && dlg_value < marker_value.value())
+			{
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.25f, 1.0f));
+				ImGui::TextUnformatted(below_marker_message);
+				ImGui::PopStyleColor();
+			}
+			else
+			{
+				ImGui::TextUnformatted(marker_label);
+			}
+			ImGui::PopTextWrapPos();
+		}
 
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + LayoutScale(10.0f));
 		if (MenuButtonWithoutSummary(FSUI_CSTR("OK"), true, LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY, g_large_font, ImVec2(0.5f, 0.0f)))
@@ -3480,6 +3517,68 @@ void FullscreenUI::DrawOSDSettingsPage()
 void FullscreenUI::DrawAudioSettingsPage()
 {
 	SettingsInterface* bsi = GetEditingSettingsInterface();
+	const auto get_effective_string = [bsi](const char* key, const char* default_value) {
+		if (IsEditingGameSettings(bsi))
+		{
+			std::optional<std::string> value = bsi->GetOptionalStringValue("SPU2/Output", key);
+			if (value.has_value())
+				return std::move(value.value());
+		}
+		return Host::Internal::GetBaseSettingsLayer()->GetStringValue("SPU2/Output", key, default_value);
+	};
+
+	const AudioBackend backend = AudioStream::ParseBackendName(
+		get_effective_string("Backend", AudioStream::GetBackendName(Pcsx2Config::SPU2Options::DEFAULT_BACKEND)).c_str())
+	                                 .value_or(Pcsx2Config::SPU2Options::DEFAULT_BACKEND);
+	const std::string driver_name = get_effective_string("DriverName", "");
+	const std::string device_name = get_effective_string("DeviceName", "");
+
+	struct OutputLatencyMinimumCache
+	{
+		AudioBackend backend = AudioBackend::Count;
+		std::string driver_name;
+		std::string device_name;
+		u32 frames = 0;
+	};
+	static OutputLatencyMinimumCache minimum_cache;
+	if (minimum_cache.backend != backend || minimum_cache.driver_name != driver_name ||
+		minimum_cache.device_name != device_name)
+	{
+		minimum_cache.backend = backend;
+		minimum_cache.driver_name = driver_name;
+		minimum_cache.device_name = device_name;
+		minimum_cache.frames = 0;
+
+		const std::vector<AudioStream::DeviceInfo> devices = AudioStream::GetOutputDevices(backend, driver_name.c_str());
+		const auto device = std::find_if(devices.begin(), devices.end(), [&device_name](const AudioStream::DeviceInfo& info) {
+			return info.name == device_name;
+		});
+		if (device != devices.end())
+			minimum_cache.frames = device->minimum_latency_frames;
+	}
+
+	const u32 minimum_latency_ms = AudioStream::GetMSForFramesCeil(SPU2::SAMPLE_RATE, minimum_cache.frames);
+	const int output_latency_ms = GetEffectiveIntSetting(
+		bsi, "SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS);
+	const std::optional<int> minimum_latency_marker =
+		minimum_latency_ms > 0 ? std::optional<int>(static_cast<int>(minimum_latency_ms)) : std::nullopt;
+	const SmallString minimum_latency_label = minimum_latency_marker.has_value() ?
+	                                              SmallString::from_format(FSUI_FSTR("Reported minimum: {} ms"),
+													  minimum_latency_marker.value()) :
+	                                              SmallString();
+	const SmallString below_minimum_warning = minimum_latency_marker.has_value() ?
+	                                              SmallString::from_format(
+													  FSUI_FSTR("Reported minimum: {} ms. Requested latency: {} ms. If audio is poor, "
+																"increase the requested latency."),
+													  minimum_latency_marker.value(), output_latency_ms) :
+	                                              SmallString();
+	const SmallString output_latency_summary =
+		(minimum_latency_marker.has_value() && output_latency_ms < minimum_latency_marker.value()) ?
+			below_minimum_warning :
+			(minimum_latency_marker.has_value() ?
+					SmallString::from_format(FSUI_FSTR("Backend minimum: {} ms. The backend may adjust the requested latency."),
+						minimum_latency_marker.value()) :
+					SmallString(FSUI_CSTR("Requests the host output latency. The backend may adjust or reject subminimum values.")));
 
 	BeginMenuButtons();
 
@@ -3515,17 +3614,16 @@ void FullscreenUI::DrawAudioSettingsPage()
 	DrawIntRangeSetting(bsi, FSUI_ICONSTR(ICON_FA_BUCKET, "Buffer Size"),
 		FSUI_CSTR("Determines the amount of audio buffered before being pulled by the host API."),
 		"SPU2/Output", "BufferMS", AudioStreamParameters::DEFAULT_BUFFER_MS, 10, 500, FSUI_CSTR("%d ms"));
-	if (!GetEffectiveBoolSetting(bsi, "Audio", "OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL))
-	{
-		DrawIntRangeSetting(
-			bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH_20, "Output Latency"),
-			FSUI_CSTR("Determines how much latency there is between the audio being picked up by the host API, and "
-					  "played through speakers."),
-			"SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS, 1, 500, FSUI_CSTR("%d ms"));
-	}
-	DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH, "Minimal Output Latency"),
-		FSUI_CSTR("When enabled, the minimum supported output latency will be used for the host API."),
-		"SPU2/Output", "OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL);
+	DrawIntRangeSetting(bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH, "Low-Latency Buffer"),
+		FSUI_CSTR("Larger buffers reduce underrun in exchange for latency."),
+		"SPU2/Output", "LowLatencyBufferMS", AudioStreamParameters::DEFAULT_LOW_LATENCY_BUFFER_MS, 10, 100,
+		FSUI_CSTR("%d ms"));
+	DrawIntRangeSetting(
+		bsi, FSUI_ICONSTR(ICON_FA_STOPWATCH_20, "Output Latency"),
+		output_latency_summary.c_str(), "SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS,
+		1, 500, FSUI_CSTR("%d ms"), true, ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT, g_large_font, g_medium_font,
+		minimum_latency_marker, minimum_latency_marker.has_value() ? minimum_latency_label.c_str() : nullptr,
+		minimum_latency_marker.has_value() ? below_minimum_warning.c_str() : nullptr);
 
 	EndMenuButtons();
 }
@@ -5948,7 +6046,6 @@ TRANSLATE_NOOP("FullscreenUI", "Expansion");
 TRANSLATE_NOOP("FullscreenUI", "Synchronization");
 TRANSLATE_NOOP("FullscreenUI", "Buffer Size");
 TRANSLATE_NOOP("FullscreenUI", "Output Latency");
-TRANSLATE_NOOP("FullscreenUI", "Minimal Output Latency");
 TRANSLATE_NOOP("FullscreenUI", "Create Memory Card");
 TRANSLATE_NOOP("FullscreenUI", "Memory Card Directory");
 TRANSLATE_NOOP("FullscreenUI", "Folder Memory Card Filter");

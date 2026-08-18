@@ -119,6 +119,9 @@
     <ClCompile Include="Settings\MemoryCardSettingsWidget.cpp">
       <Filter>Settings</Filter>
     </ClCompile>
+    <ClCompile Include="Settings\AudioLatencySlider.cpp">
+      <Filter>Settings</Filter>
+    </ClCompile>
     <ClCompile Include="Settings\AudioSettingsWidget.cpp">
       <Filter>Settings</Filter>
     </ClCompile>
@@ -303,6 +306,9 @@
       <Filter>Settings</Filter>
     </ClInclude>
     <ClInclude Include="Settings\MemoryCardConvertWorker.h">
+      <Filter>Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="Settings\AudioLatencySlider.h">
       <Filter>Settings</Filter>
     </ClInclude>
     <ClInclude Include="Settings\OsdFontPickerDialog.h">

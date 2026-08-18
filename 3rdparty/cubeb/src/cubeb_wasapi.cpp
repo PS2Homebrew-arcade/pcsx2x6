@@ -300,6 +300,8 @@ typedef enum {
 
 struct cubeb {
   cubeb_ops const * ops = &wasapi_ops;
+  bool use_iaudioclient3 = false;
+  bool use_exclusive_mode = false;
   owned_critical_section lock;
   cubeb_strings * device_ids;
   /* Device enumerator to get notifications when the
@@ -474,6 +476,8 @@ struct cubeb_stream {
   float volume = 1.0;
   /* True if the stream is draining. */
   bool draining = false;
+  /* Exclusive event streams must write one complete buffer before Start. */
+  bool output_needs_priming = false;
   /* This needs an active audio input stream to be known, and is updated in the
    * first audio input callback. */
   std::atomic<int64_t> input_latency_hns{LATENCY_NOT_AVAILABLE_YET};
@@ -1003,6 +1007,35 @@ mask_to_channel_layout(WAVEFORMATEX const * fmt)
   return mask;
 }
 
+bool
+waveformatex_is_compatible(WAVEFORMATEX const * lhs,
+                           WAVEFORMATEX const * rhs)
+{
+  if (!lhs || !rhs || lhs->wFormatTag != rhs->wFormatTag ||
+      lhs->nChannels != rhs->nChannels ||
+      lhs->nSamplesPerSec != rhs->nSamplesPerSec ||
+      lhs->wBitsPerSample != rhs->wBitsPerSample ||
+      lhs->nBlockAlign != rhs->nBlockAlign) {
+    return false;
+  }
+
+  if (lhs->wFormatTag != WAVE_FORMAT_EXTENSIBLE) {
+    return true;
+  }
+
+  if (lhs->cbSize < sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX) ||
+      rhs->cbSize < sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)) {
+    return false;
+  }
+
+  auto lhs_ext = reinterpret_cast<WAVEFORMATEXTENSIBLE const *>(lhs);
+  auto rhs_ext = reinterpret_cast<WAVEFORMATEXTENSIBLE const *>(rhs);
+  return lhs_ext->Samples.wValidBitsPerSample ==
+             rhs_ext->Samples.wValidBitsPerSample &&
+         lhs_ext->dwChannelMask == rhs_ext->dwChannelMask &&
+         IsEqualGUID(lhs_ext->SubFormat, rhs_ext->SubFormat);
+}
+
 uint32_t
 get_rate(cubeb_stream * stm)
 {
@@ -1026,6 +1059,59 @@ REFERENCE_TIME
 frames_to_hns(uint32_t rate, uint32_t frames)
 {
   return std::ceil(frames * 10000000.0 / rate);
+}
+
+uint32_t
+frames_to_rate(uint32_t frames, uint32_t source_rate, uint32_t target_rate)
+{
+  XASSERT(source_rate);
+  uint64_t numerator = uint64_t(frames) * target_rate + source_rate - 1;
+  return static_cast<uint32_t>(
+      std::min<uint64_t>(numerator / source_rate,
+                         std::numeric_limits<uint32_t>::max()));
+}
+
+struct shared_mode_engine_periods {
+  uint32_t default_period;
+  uint32_t fundamental_period;
+  uint32_t minimum_period;
+  uint32_t maximum_period;
+};
+
+bool
+shared_mode_engine_periods_are_valid(
+    shared_mode_engine_periods const & periods)
+{
+  return periods.fundamental_period && periods.minimum_period &&
+         periods.maximum_period >= periods.minimum_period;
+}
+
+HRESULT
+get_shared_mode_engine_periods(com_ptr<IAudioClient> & audio_client,
+                               WAVEFORMATEX const * format,
+                               com_ptr<IAudioClient3> & audio_client3,
+                               shared_mode_engine_periods & periods)
+{
+  HRESULT hr =
+      audio_client->QueryInterface<IAudioClient3>(audio_client3.receive());
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  AudioClientProperties properties = {};
+  properties.cbSize = sizeof(AudioClientProperties);
+#ifndef __MINGW32__
+  properties.eCategory = AudioCategory_GameEffects;
+#endif
+  hr = audio_client3->SetClientProperties(&properties);
+  if (FAILED(hr)) {
+    LOG("Could not set IAudioClient3 game-effects properties: %lx", hr);
+    return hr;
+  }
+
+  return audio_client3->GetSharedModeEnginePeriod(
+      format, &periods.default_period, &periods.fundamental_period,
+      &periods.minimum_period, &periods.maximum_period);
 }
 
 /* This returns the size of a frame in the stream, before the eventual upmix
@@ -1284,6 +1370,36 @@ get_output_buffer(cubeb_stream * stm, void *& buffer, size_t & frame_count)
 
   XASSERT(has_output(stm));
 
+  if (stm->context->use_exclusive_mode) {
+    if (stm->draining) {
+      LOG("WASAPI exclusive draining finished.");
+      wasapi_state_callback(stm, stm->user_ptr, CUBEB_STATE_DRAINED);
+      return false;
+    }
+
+    frame_count = stm->output_buffer_frame_count;
+    BYTE * output_buffer = nullptr;
+    hr = stm->render_client->GetBuffer(frame_count, &output_buffer);
+    if (hr == AUDCLNT_E_DEVICE_INVALIDATED) {
+      LOG("WASAPI exclusive output device invalidated");
+      if (stm->output_device_id ||
+          (stm->output_stream_params.prefs &
+           CUBEB_STREAM_PREF_DISABLE_DEVICE_SWITCHING) ||
+          !trigger_async_reconfigure(stm)) {
+        wasapi_state_callback(stm, stm->user_ptr, CUBEB_STATE_ERROR);
+        return false;
+      }
+      frame_count = 0;
+      return true;
+    }
+    if (FAILED(hr)) {
+      LOG("Cannot get WASAPI exclusive render buffer: %lx", hr);
+      return false;
+    }
+    buffer = output_buffer;
+    return true;
+  }
+
   hr = stm->output_client->GetCurrentPadding(&padding_out);
   if (hr == AUDCLNT_E_DEVICE_INVALIDATED) {
     // Application can recover from this error. More info
@@ -1479,13 +1595,51 @@ refill_callback_output(cubeb_stream * stm)
   }
   XASSERT(size_t(got) == output_frames || stm->draining);
 
-  hr = stm->render_client->ReleaseBuffer(got, 0);
+  size_t frames_to_release = got;
+  if (stm->context->use_exclusive_mode) {
+    if (size_t(got) < output_frames) {
+      size_t frame_size =
+          stm->output_mix_params.channels * stm->bytes_per_sample;
+      memset(static_cast<BYTE *>(output_buffer) + size_t(got) * frame_size, 0,
+             (output_frames - size_t(got)) * frame_size);
+    }
+    frames_to_release = output_frames;
+  }
+
+  hr = stm->render_client->ReleaseBuffer(frames_to_release, 0);
   if (FAILED(hr)) {
     LOG("failed to release buffer: %lx", hr);
     return false;
   }
 
   return size_t(got) == output_frames || stm->draining;
+}
+
+int
+prime_exclusive_output(cubeb_stream * stm)
+{
+  if (!stm->context->use_exclusive_mode || !stm->output_needs_priming) {
+    return CUBEB_OK;
+  }
+
+  BYTE * output_buffer = nullptr;
+  HRESULT hr = stm->render_client->GetBuffer(stm->output_buffer_frame_count,
+                                              &output_buffer);
+  if (FAILED(hr)) {
+    LOG("Could not get WASAPI exclusive priming buffer: %lx", hr);
+    return CUBEB_ERROR;
+  }
+
+  hr = stm->render_client->ReleaseBuffer(stm->output_buffer_frame_count,
+                                         AUDCLNT_BUFFERFLAGS_SILENT);
+  if (FAILED(hr)) {
+    LOG("Could not release WASAPI exclusive priming buffer: %lx", hr);
+    return CUBEB_ERROR;
+  }
+
+  stm->output_needs_priming = false;
+  LOG("Primed WASAPI exclusive output buffer with silence");
+  return CUBEB_OK;
 }
 
 void
@@ -1539,17 +1693,25 @@ static unsigned int __stdcall wasapi_stream_render_loop(LPVOID stream)
       /* stm->active was set by wasapi_stream_start/_stop before signaling,
          and SetEvent provides the necessary memory barrier. */
       if (stm->active && !mmcss_handle) {
-        /* We could consider using "Pro Audio" here for WebAudio and
-           maybe WebRTC. */
+        /* Exclusive output benefits from the higher-priority Pro Audio task;
+           retain the established Audio task for shared streams. */
+        const char * mmcss_task = stm->context->use_exclusive_mode
+                                      ? "Pro Audio"
+                                      : "Audio";
         mmcss_handle =
-            AvSetMmThreadCharacteristicsA("Audio", &mmcss_task_index);
+            AvSetMmThreadCharacteristicsA(mmcss_task, &mmcss_task_index);
+        if (!mmcss_handle && stm->context->use_exclusive_mode) {
+          mmcss_task = "Audio";
+          mmcss_handle =
+              AvSetMmThreadCharacteristicsA(mmcss_task, &mmcss_task_index);
+        }
         if (!mmcss_handle) {
           /* This is not fatal, but we might glitch under heavy load. */
           LOG("Unable to use mmcss to bump the render thread priority: %lx",
               GetLastError());
         } else {
-          LOG("MMCSS render thread promoted (task index %lu)",
-              mmcss_task_index);
+          LOG("MMCSS render thread promoted with %s profile (task index %lu)",
+              mmcss_task, mmcss_task_index);
         }
       } else if (!stm->active && mmcss_handle) {
         AvRevertMmThreadCharacteristics(mmcss_handle);
@@ -1592,6 +1754,12 @@ static unsigned int __stdcall wasapi_stream_render_loop(LPVOID stream)
       LOG("Stream setup successfuly.");
       XASSERT(stm->output_client || stm->input_client);
       if (stm->output_client) {
+        r = prime_exclusive_output(stm);
+        if (r != CUBEB_OK) {
+          is_playing = false;
+          hr = E_FAIL;
+          continue;
+        }
         hr = stm->output_client->Start();
         if (FAILED(hr)) {
           LOG("Error starting output after reconfigure, error: %lx", hr);
@@ -1860,8 +2028,9 @@ stream_set_volume(cubeb_stream * stm, float volume)
 } // namespace
 
 extern "C" {
-int
-wasapi_init(cubeb ** context, char const * context_name)
+static int
+wasapi_init_internal(cubeb ** context, char const * context_name,
+                     bool use_iaudioclient3, bool use_exclusive_mode)
 {
   /* We don't use the device yet, but need to make sure we can initialize one
      so that this backend is not incorrectly enabled on platforms that don't
@@ -1881,6 +2050,8 @@ wasapi_init(cubeb ** context, char const * context_name)
   cubeb * ctx = new cubeb();
 
   ctx->ops = &wasapi_ops;
+  ctx->use_iaudioclient3 = use_iaudioclient3;
+  ctx->use_exclusive_mode = use_exclusive_mode;
   auto_lock lock(ctx->lock);
   if (cubeb_strings_init(&ctx->device_ids) != CUBEB_OK) {
     delete ctx;
@@ -1899,6 +2070,24 @@ wasapi_init(cubeb ** context, char const * context_name)
   *context = ctx;
 
   return CUBEB_OK;
+}
+
+int
+wasapi_init(cubeb ** context, char const * context_name)
+{
+  return wasapi_init_internal(context, context_name, false, false);
+}
+
+int
+iaudioclient3_init(cubeb ** context, char const * context_name)
+{
+  return wasapi_init_internal(context, context_name, true, false);
+}
+
+int
+wasapi_exclusive_init(cubeb ** context, char const * context_name)
+{
+  return wasapi_init_internal(context, context_name, false, true);
 }
 }
 
@@ -1948,7 +2137,10 @@ wasapi_destroy(cubeb * context)
 char const *
 wasapi_get_backend_id(cubeb * context)
 {
-  return "wasapi";
+  if (context->use_iaudioclient3) {
+    return "iaudioclient3";
+  }
+  return context->use_exclusive_mode ? "wasapi-exclusive" : "wasapi";
 }
 
 int
@@ -2007,6 +2199,34 @@ wasapi_get_min_latency(cubeb * ctx, cubeb_stream_params params,
     return CUBEB_ERROR;
   }
 
+  if (ctx->use_iaudioclient3) {
+    WAVEFORMATEX * tmp = nullptr;
+    hr = client->GetMixFormat(&tmp);
+    if (SUCCEEDED(hr)) {
+      com_heap_ptr<WAVEFORMATEX> mix_format(tmp);
+      com_ptr<IAudioClient3> client3;
+      shared_mode_engine_periods periods = {};
+      hr = get_shared_mode_engine_periods(client, mix_format.get(), client3,
+                                          periods);
+      if (SUCCEEDED(hr) && shared_mode_engine_periods_are_valid(periods)) {
+        *latency_frames = frames_to_rate(periods.minimum_period,
+                                         mix_format->nSamplesPerSec,
+                                         params.rate);
+        LOG("IAudioClient3 AudioCategory_GameEffects engine periods in "
+            "mix-rate frames: default=%u, fundamental=%u, minimum=%u, "
+            "maximum=%u",
+            periods.default_period, periods.fundamental_period,
+            periods.minimum_period, periods.maximum_period);
+        LOG("Minimum latency in stream-rate frames: %u", *latency_frames);
+        return CUBEB_OK;
+      }
+    }
+
+    LOG("Could not query IAudioClient3 engine period: %lx; using the shared "
+        "WASAPI default period",
+        hr);
+  }
+
   REFERENCE_TIME minimum_period;
   REFERENCE_TIME default_period;
   hr = client->GetDevicePeriod(&default_period, &minimum_period);
@@ -2018,18 +2238,14 @@ wasapi_get_min_latency(cubeb * ctx, cubeb_stream_params params,
   LOG("default device period: %I64d, minimum device period: %I64d",
       default_period, minimum_period);
 
-  /* If we're on Windows 10, we can use IAudioClient3 to get minimal latency.
-     Otherwise, according to the docs, the best latency we can achieve is by
-     synchronizing the stream and the engine.
-     http://msdn.microsoft.com/en-us/library/windows/desktop/dd370871%28v=vs.85%29.aspx
-   */
-
-  // #ifdef _WIN32_WINNT_WIN10
-#if 0
-     *latency_frames = hns_to_frames(params.rate, minimum_period);
-#else
-  *latency_frames = hns_to_frames(params.rate, default_period);
-#endif
+  if (ctx->use_exclusive_mode) {
+    *latency_frames = hns_to_frames(params.rate, minimum_period);
+  } else {
+    // The minimum period returned by GetDevicePeriod is for exclusive mode.
+    // A regular shared-mode IAudioClient stream synchronizes to the default
+    // engine period instead.
+    *latency_frames = hns_to_frames(params.rate, default_period);
+  }
 
   LOG("Minimum latency in frames: %u", *latency_frames);
 
@@ -2183,118 +2399,172 @@ initialize_iaudioclient2(com_ptr<IAudioClient> & audio_client,
   return CUBEB_OK;
 }
 
-#if 0
 bool
 initialize_iaudioclient3(com_ptr<IAudioClient> & audio_client,
-                         cubeb_stream * stm,
                          const com_heap_ptr<WAVEFORMATEX> & mix_format,
-                         DWORD flags, EDataFlow direction)
+                         DWORD flags, REFERENCE_TIME latency_hns)
 {
   com_ptr<IAudioClient3> audio_client3;
-  audio_client->QueryInterface<IAudioClient3>(audio_client3.receive());
-  if (!audio_client3) {
-    LOG("Could not get IAudioClient3 interface");
-    return false;
-  }
-
-  if (flags & AUDCLNT_STREAMFLAGS_LOOPBACK) {
-    // IAudioClient3 doesn't work with loopback streams, and will return error
-    // 88890021: AUDCLNT_E_INVALID_STREAM_FLAG
-    LOG("Audio stream is loopback, not using IAudioClient3");
-    return false;
-  }
-
-  // Some people have reported glitches with capture streams:
-  // http://blog.nirbheek.in/2018/03/low-latency-audio-on-windows-with.html
-  if (direction == eCapture) {
-    LOG("Audio stream is capture, not using IAudioClient3");
-    return false;
-  }
-
-  // Possibly initialize a shared-mode stream using IAudioClient3. Initializing
-  // a stream this way lets you request lower latencies, but also locks the
-  // global WASAPI engine at that latency.
-  // - If we request a shared-mode stream, streams created with IAudioClient
-  // will
-  //   have their latency adjusted to match. When  the shared-mode stream is
-  //   closed, they'll go back to normal.
-  // - If there's already a shared-mode stream running, then we cannot request
-  //   the engine change to a different latency - we have to match it.
-  // - It's antisocial to lock the WASAPI engine at its default latency. If we
-  //   would do this, then stop and use IAudioClient instead.
-
-  HRESULT hr;
-  uint32_t default_period = 0, fundamental_period = 0, min_period = 0,
-           max_period = 0;
-  hr = audio_client3->GetSharedModeEnginePeriod(
-      mix_format.get(), &default_period, &fundamental_period, &min_period,
-      &max_period);
+  shared_mode_engine_periods periods = {};
+  HRESULT hr = get_shared_mode_engine_periods(
+      audio_client, mix_format.get(), audio_client3, periods);
   if (FAILED(hr)) {
-    LOG("Could not get shared mode engine period: error: %lx", hr);
+    LOG("Could not query IAudioClient3 engine periods: %lx", hr);
     return false;
-  }
-  uint32_t requested_latency = stm->latency;
-  if (requested_latency >= default_period) {
-    LOG("Requested latency %i greater than default latency %i, not using "
-        "IAudioClient3",
-        requested_latency, default_period);
-    return false;
-  }
-  LOG("Got shared mode engine period: default=%i fundamental=%i min=%i max=%i",
-      default_period, fundamental_period, min_period, max_period);
-  // Snap requested latency to a valid value
-  uint32_t old_requested_latency = requested_latency;
-  if (requested_latency < min_period) {
-    requested_latency = min_period;
-  }
-  requested_latency -= (requested_latency - min_period) % fundamental_period;
-  if (requested_latency != old_requested_latency) {
-    LOG("Requested latency %i was adjusted to %i", old_requested_latency,
-        requested_latency);
   }
 
-  hr = audio_client3->InitializeSharedAudioStream(flags, requested_latency,
+  if (!shared_mode_engine_periods_are_valid(periods)) {
+    LOG("IAudioClient3 returned invalid engine periods: fundamental=%u, "
+        "minimum=%u, maximum=%u",
+        periods.fundamental_period, periods.minimum_period,
+        periods.maximum_period);
+    return false;
+  }
+
+  uint32_t requested_period =
+      hns_to_frames(mix_format->nSamplesPerSec, latency_hns);
+  uint32_t adjusted_period =
+      std::max(periods.minimum_period,
+               std::min(requested_period, periods.maximum_period));
+  adjusted_period -= adjusted_period % periods.fundamental_period;
+  if (adjusted_period < periods.minimum_period) {
+    adjusted_period = periods.minimum_period;
+  }
+
+  LOG("IAudioClient3 AudioCategory_GameEffects engine periods in mix-rate "
+      "frames: default=%u, fundamental=%u, minimum=%u, maximum=%u",
+      periods.default_period, periods.fundamental_period,
+      periods.minimum_period, periods.maximum_period);
+  if (adjusted_period != requested_period) {
+    LOG("IAudioClient3 adjusted requested period from %u to %u frames",
+        requested_period, adjusted_period);
+  }
+
+  hr = audio_client3->InitializeSharedAudioStream(flags, adjusted_period,
                                                   mix_format.get(), NULL);
   if (SUCCEEDED(hr)) {
     return true;
-  } else if (hr == AUDCLNT_E_ENGINE_PERIODICITY_LOCKED) {
-    LOG("Got AUDCLNT_E_ENGINE_PERIODICITY_LOCKED, adjusting latency request");
-  } else {
-    LOG("Could not initialize shared stream with IAudioClient3: error: %lx",
-        hr);
+  }
+
+  if (hr != AUDCLNT_E_ENGINE_PERIODICITY_LOCKED) {
+    LOG("Could not initialize IAudioClient3 stream: %lx", hr);
     return false;
   }
 
   uint32_t current_period = 0;
-  WAVEFORMATEX * current_format = nullptr;
-  // We have to pass a valid WAVEFORMATEX** and not nullptr, otherwise
-  // GetCurrentSharedModeEnginePeriod will return E_POINTER
-  hr = audio_client3->GetCurrentSharedModeEnginePeriod(&current_format,
+  WAVEFORMATEX * tmp = nullptr;
+  hr = audio_client3->GetCurrentSharedModeEnginePeriod(&tmp,
                                                        &current_period);
-  CoTaskMemFree(current_format);
-  if (FAILED(hr)) {
-    LOG("Could not get current shared mode engine period: error: %lx", hr);
+  if (FAILED(hr) || !tmp) {
+    LOG("Could not get locked IAudioClient3 engine period: %lx", hr);
     return false;
   }
+  com_heap_ptr<WAVEFORMATEX> current_format(tmp);
 
-  if (current_period >= default_period) {
-    LOG("Current shared mode engine period %i too high, not using IAudioClient",
-        current_period);
+  if (!waveformatex_is_compatible(current_format.get(), mix_format.get())) {
+    LOG("Locked IAudioClient3 engine format differs from the requested mix "
+        "format; using IAudioClient");
     return false;
   }
 
   hr = audio_client3->InitializeSharedAudioStream(flags, current_period,
                                                   mix_format.get(), NULL);
   if (SUCCEEDED(hr)) {
-    LOG("Current shared mode engine period is %i instead of requested %i",
-        current_period, requested_latency);
+    LOG("Using locked IAudioClient3 engine period %u instead of requested %u",
+        current_period, adjusted_period);
     return true;
   }
 
-  LOG("Could not initialize shared stream with IAudioClient3: error: %lx", hr);
+  LOG("Could not initialize locked-period IAudioClient3 stream: %lx", hr);
   return false;
 }
-#endif
+
+HRESULT
+initialize_exclusive_stream(com_ptr<IAudioClient> & audio_client,
+                            com_ptr<IMMDevice> const & device,
+                            const com_heap_ptr<WAVEFORMATEX> & format,
+                            DWORD flags, REFERENCE_TIME requested_latency_hns)
+{
+  WAVEFORMATEX legacy_format = {};
+  WAVEFORMATEX const * selected_format = format.get();
+  HRESULT hr = audio_client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
+                                                selected_format, nullptr);
+  if (hr == AUDCLNT_E_UNSUPPORTED_FORMAT &&
+      format->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
+      format->nChannels <= 2) {
+    WAVEFORMATEXTENSIBLE const * extensible =
+        reinterpret_cast<WAVEFORMATEXTENSIBLE const *>(format.get());
+    WORD legacy_tag = 0;
+    if (IsEqualGUID(extensible->SubFormat, KSDATAFORMAT_SUBTYPE_PCM)) {
+      legacy_tag = WAVE_FORMAT_PCM;
+    } else if (IsEqualGUID(extensible->SubFormat,
+                           KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)) {
+      legacy_tag = WAVE_FORMAT_IEEE_FLOAT;
+    }
+
+    if (legacy_tag) {
+      legacy_format = *format;
+      legacy_format.wFormatTag = legacy_tag;
+      legacy_format.cbSize = 0;
+      hr = audio_client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,
+                                            &legacy_format, nullptr);
+      if (hr == S_OK) {
+        selected_format = &legacy_format;
+        LOG("Using legacy WAVEFORMATEX for WASAPI exclusive stream");
+      }
+    }
+  }
+  if (hr != S_OK) {
+    LOG("WASAPI exclusive format is not supported: %lx", hr);
+    return FAILED(hr) ? hr : AUDCLNT_E_UNSUPPORTED_FORMAT;
+  }
+
+  REFERENCE_TIME default_period = 0;
+  REFERENCE_TIME minimum_period = 0;
+  hr = audio_client->GetDevicePeriod(&default_period, &minimum_period);
+  if (FAILED(hr)) {
+    LOG("Could not query WASAPI exclusive device period: %lx", hr);
+    return hr;
+  }
+
+  REFERENCE_TIME period_hns = std::max(requested_latency_hns, minimum_period);
+  LOG("WASAPI exclusive periods: default=%I64d hns, minimum=%I64d hns, "
+      "requested=%I64d hns, using=%I64d hns",
+      default_period, minimum_period, requested_latency_hns, period_hns);
+
+  hr = audio_client->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, flags, period_hns,
+                                period_hns, selected_format, NULL);
+  if (hr != AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED) {
+    return hr;
+  }
+
+  UINT32 aligned_frames = 0;
+  hr = audio_client->GetBufferSize(&aligned_frames);
+  if (FAILED(hr)) {
+    LOG("Could not get aligned WASAPI exclusive buffer size: %lx", hr);
+    return hr;
+  }
+
+  period_hns = static_cast<REFERENCE_TIME>(
+      (uint64_t(aligned_frames) * 10000000 +
+       selected_format->nSamplesPerSec / 2) /
+      selected_format->nSamplesPerSec);
+  LOG("WASAPI exclusive aligned period is %u frames (%I64d hns)",
+      aligned_frames, period_hns);
+
+  // IAudioClient must be released and activated again after the alignment
+  // probe. This path needs proper testing across older USB audio drivers.
+  audio_client = nullptr;
+  hr = device->Activate(__uuidof(IAudioClient), CLSCTX_INPROC_SERVER, NULL,
+                        audio_client.receive_vpp());
+  if (FAILED(hr)) {
+    LOG("Could not reactivate aligned WASAPI exclusive client: %lx", hr);
+    return hr;
+  }
+
+  return audio_client->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, flags,
+                                  period_hns, period_hns, selected_format, NULL);
+}
 
 #define DIRECTION_NAME (direction == eCapture ? "capture" : "render")
 
@@ -2512,16 +2782,37 @@ setup_wasapi_stream_one_side(cubeb_stream * stm,
     }
   }
 
-#if 0 // See https://bugzilla.mozilla.org/show_bug.cgi?id=1590902
-  if (initialize_iaudioclient3(audio_client, stm, mix_format, flags, direction)) {
-    LOG("Initialized with IAudioClient3");
-  } else {
-#endif
-  hr = audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, latency_hns, 0,
-                                mix_format.get(), NULL);
-#if 0
+  bool initialized = false;
+  if (stm->context->use_exclusive_mode) {
+    if (direction != eRender || is_loopback) {
+      LOG("WASAPI exclusive backend only supports output streams");
+      return CUBEB_ERROR_NOT_SUPPORTED;
+    }
+    hr = initialize_exclusive_stream(audio_client, device, mix_format, flags,
+                                     latency_hns);
+    if (FAILED(hr)) {
+      LOG("Unable to initialize WASAPI exclusive render client: %lx", hr);
+      return CUBEB_ERROR;
+    }
+    initialized = true;
+    LOG("Initialized WASAPI exclusive stream");
+  } else if (stm->context->use_iaudioclient3 && direction == eRender &&
+             !is_loopback) {
+    // Keep this opt-in and output-only: capture was implicated in the Cubeb
+    // regressions that disabled IAudioClient3 and needs proper testing.
+    initialized =
+        initialize_iaudioclient3(audio_client, mix_format, flags, latency_hns);
   }
-#endif
+
+  if (initialized) {
+    if (stm->context->use_iaudioclient3) {
+      LOG("Initialized with IAudioClient3");
+    }
+    hr = S_OK;
+  } else {
+    hr = audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, latency_hns,
+                                  0, mix_format.get(), NULL);
+  }
   if (FAILED(hr)) {
     LOG("Unable to initialize audio client for %s: %lx.", DIRECTION_NAME, hr);
     return CUBEB_ERROR;
@@ -2854,6 +3145,9 @@ setup_wasapi_stream(cubeb_stream * stm)
         frames_to_bytes_before_mix(stm, stm->output_buffer_frame_count));
   }
 
+  stm->output_needs_priming =
+      stm->context->use_exclusive_mode && has_output(stm);
+
   return CUBEB_OK;
 }
 
@@ -2880,6 +3174,11 @@ wasapi_stream_init(cubeb * context, cubeb_stream ** stream,
   int rv;
 
   XASSERT(context && stream && (input_stream_params || output_stream_params));
+
+  if (context->use_exclusive_mode && input_stream_params) {
+    LOG("WASAPI exclusive backend does not support input streams");
+    return CUBEB_ERROR_NOT_SUPPORTED;
+  }
 
   if (output_stream_params && input_stream_params &&
       output_stream_params->format != input_stream_params->format) {
@@ -3049,6 +3348,7 @@ close_wasapi_stream(cubeb_stream * stm)
   stm->render_client = nullptr;
   stm->output_client = nullptr;
   stm->output_device = nullptr;
+  stm->output_needs_priming = false;
 
   stm->capture_client = nullptr;
   stm->input_client = nullptr;
@@ -3134,6 +3434,13 @@ stream_start_one_side(cubeb_stream * stm, StreamDirection dir)
   XASSERT((dir == OUTPUT && stm->output_client) ||
           (dir == INPUT && stm->input_client));
 
+  if (dir == OUTPUT) {
+    int rv = prime_exclusive_output(stm);
+    if (rv != CUBEB_OK) {
+      return rv;
+    }
+  }
+
   HRESULT hr =
       dir == OUTPUT ? stm->output_client->Start() : stm->input_client->Start();
   if (hr == AUDCLNT_E_DEVICE_INVALIDATED) {
@@ -3151,6 +3458,13 @@ stream_start_one_side(cubeb_stream * stm, StreamDirection dir)
     if (r != CUBEB_OK) {
       LOG("reconfigure failed");
       return r;
+    }
+
+    if (dir == OUTPUT) {
+      r = prime_exclusive_output(stm);
+      if (r != CUBEB_OK) {
+        return r;
+      }
     }
 
     HRESULT hr2 = dir == OUTPUT ? stm->output_client->Start()
@@ -3584,6 +3898,29 @@ wasapi_create_device(cubeb * ctx, cubeb_device_info & ret,
       SUCCEEDED(client->GetDevicePeriod(&def_period, &min_period))) {
     ret.latency_lo = hns_to_frames(ret.default_rate, min_period);
     ret.latency_hi = hns_to_frames(ret.default_rate, def_period);
+
+    if (ctx->use_iaudioclient3 && flow == eRender) {
+      // If IAudioClient3 is unavailable this backend falls back to ordinary
+      // shared WASAPI, whose guaranteed period is the default period.
+      ret.latency_lo = ret.latency_hi;
+
+      WAVEFORMATEX * tmp = nullptr;
+      if (SUCCEEDED(client->GetMixFormat(&tmp))) {
+        com_heap_ptr<WAVEFORMATEX> mix_format(tmp);
+        com_ptr<IAudioClient3> client3;
+        shared_mode_engine_periods periods = {};
+        if (SUCCEEDED(get_shared_mode_engine_periods(
+                client, mix_format.get(), client3, periods)) &&
+            shared_mode_engine_periods_are_valid(periods)) {
+          uint32_t target_rate =
+              ret.default_rate ? ret.default_rate : mix_format->nSamplesPerSec;
+          ret.latency_lo = frames_to_rate(
+              periods.minimum_period, mix_format->nSamplesPerSec, target_rate);
+          ret.latency_hi = frames_to_rate(
+              periods.maximum_period, mix_format->nSamplesPerSec, target_rate);
+        }
+      }
+    }
   } else {
     ret.latency_lo = 0;
     ret.latency_hi = 0;
