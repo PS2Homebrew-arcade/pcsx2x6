@@ -6,11 +6,10 @@
 /**
  * @file ACRAM.h
  * Additional RAM memory living on the namco board
- * The RAM can be 32 or 64mb sized, or directly, not be there
- * System246 DRIVING : ACRAM is an external PCB, can be 0, 32, 64
- * System246 Rack A : Same than DRIVING unit
- * System246 Rack B : Builtin on the namco board, seems like 64mb version
- * System246 Rack C : same than Rack B
+ * The RAM can be 32, 64, 96 or 128mb sized, or directly, not be there
+ * System246 Rack A (DRIVING/GUN) : ACRAM is an external PCB of either 32 or 64mb, namco expansion board has two slots for them
+ * System246 Rack B : Builtin on the namco board, 64mb version
+ * System246 Rack C : Builtin on the board, 64mb version
  * System256 : ACRAM is no longer part of the system
  *
  * 64MB = 2 x 32MB banks. Each bank has independent DMA read/write pointers.
