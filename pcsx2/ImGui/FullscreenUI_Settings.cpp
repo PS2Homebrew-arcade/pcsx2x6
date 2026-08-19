@@ -5029,6 +5029,7 @@ void FullscreenUI::DrawAdvancedSettingsPage()
 			bsi, FSUI_ICONSTR(ICON_FA_COMPACT_DISC, "CDVD Verbose Reads"), FSUI_CSTR("Logs disc reads from games."), "EmuCore", "CdvdVerboseReads", false);
 		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade ATA Verbose Reads"), FSUI_CSTR("Logs Arcade ATA reads from games."), "Arcade", "ATAVerboseReads", false);
 		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade SRAM Verbose Reads"), FSUI_CSTR("Logs Arcade SRAM reads/writes from games."), "Arcade", "SRAMVerboseReads", false);
+		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade JVS Verbose Reads"), FSUI_CSTR("Logs the contents of the input and output buffer for the JVS controller"), "Arcade", "ACJVVerbose", false);
 		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade RAM Verbose Reads"), FSUI_CSTR("Logs Arcade RAM transfers from games."), "Arcade", "RAMVerboseReads", false);
 		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Arcade UART Verbose Reads"), FSUI_CSTR("Logs TX/RX from the arcade UART"), "Arcade", "UARTVerbose", false);
 	}
