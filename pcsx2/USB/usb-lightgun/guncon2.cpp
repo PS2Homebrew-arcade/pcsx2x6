@@ -244,7 +244,7 @@ namespace usb_lightgun
 			us->auto_config_done = true;
 		}
 
-		DevCon.WriteLn("guncon2: req %04X val: %04X idx: %04X len: %d\n", request, value, index, length);
+		DevCon.WriteLn("guncon2: req %04X val: %04X idx: %04X len: %d", request, value, index, length);
 		if (usb_desc_handle_control(dev, p, request, value, index, length, data) >= 0)
 			return;
 
