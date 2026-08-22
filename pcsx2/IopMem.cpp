@@ -133,6 +133,8 @@ u8 iopMemRead8(u32 mem)
 	} else if (t == 0x1241) {
 		u16 val16 = ACCORE::Read16(mem & ~1);
 		return (mem & 1) ? (u8)(val16 >> 8) : (u8)val16;
+	} else if ((t & 0xFFF0) == CARDIF_REGBASE0 || (t & 0xFF00) == CARDIF_REGBASE1) {
+		return CARDIF::Read16(mem);
 	} else if (t == 0x1f40) {
 		return psxHw4Read8(mem);
 	}
@@ -189,8 +191,9 @@ u16 iopMemRead16(u32 mem)
 	} else if ((t & 0xFF00) == ACATA_RANGE) {
 		V = ACATA::read16(mem);
 		return V;
-	}
-	else
+	} else if ((t & 0xFFF0) == CARDIF_REGBASE0 || (t & 0xFF00) == CARDIF_REGBASE1) {
+		return CARDIF::Read16(mem);
+	} else
 	{
 		const u8* p = (const u8*)(psxMemRLUT[mem >> 16]);
 		if (p != NULL)
@@ -318,25 +321,22 @@ void iopMemWrite8(u32 mem, u8 value)
 	else if (t == 0x1f40)
 	{
 		psxHw4Write8(mem, value);
-	}
-	else if ((t & 0xFF00) == ACRAM_RANGE)
-	{
+	} else if ((t & 0xFF00) == ACRAM_RANGE) {
 		u16 cur = ACRAM::Read16(mem & ~1);
 		if (mem & 1) cur = (cur & 0x00FF) | ((u16)value << 8);
 		else         cur = (cur & 0xFF00) | value;
 		ACRAM::Write16(mem & ~1, cur);
-	}
-	else if ((t & 0xFF00) == ACATA_RANGE)
-	{
+	} else if ((t & 0xFF00) == ACATA_RANGE) {
 		u16 cur = ACATA::read16(mem & ~1);
 		if (mem & 1) cur = (cur & 0x00FF) | ((u16)value << 8);
 		else         cur = (cur & 0xFF00) | value;
 		ACATA::write16(mem & ~1, cur);
-	}
-	else if (t == ACJV_RANGE)
-	{
+	} else if (t == ACJV_RANGE) {
 		if (ACJV::enabled) ACJV::Write16(mem & ~1, value);
+	} else if ((t & 0xFFF0) == CARDIF_REGBASE0 || (t & 0xFF00) == CARDIF_REGBASE1) {
+		CARDIF::Write16(mem, value);
 	}
+
 	else if (t == 0x1241)
 	{
 		ACCORE::Write16(mem & ~1, value);
@@ -401,6 +401,8 @@ void iopMemWrite16(u32 mem, u16 value)
 			ACCORE::Write16(mem, value);
 	} else if ((t & 0xFF00) == 0x1300) {
 		ACCORE::Interrupt(mem, value);
+	} else if ((t & 0xFFF0) == CARDIF_REGBASE0 || (t & 0xFF00) == CARDIF_REGBASE1) {
+		CARDIF::Write16(mem, value);
 	} else
 	{
 		u8* p = (u8 *)(psxMemWLUT[mem >> 16]);

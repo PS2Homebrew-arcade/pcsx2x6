@@ -8,6 +8,8 @@
 
 #define ACUART_LOG(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.WriteLn(Color_Gray, "ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
 #define ACUART_WARN(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.Warning("ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
+#define CARDIF_LOG(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.WriteLn(Color_Gray, "CARDIF:" fmt __VA_OPT__(,) __VA_ARGS__)
+#define CARDIF_WARN(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.Warning("CARDIF:" fmt __VA_OPT__(,) __VA_ARGS__)
 
 // 16550 UART register emulation for Namco System 246 arcade I/O
 // Ref: ps2sdk iop/arcade/acuart/src/uart.c
@@ -118,3 +120,42 @@ void ACUART::Write16(u32 addr, u16 val) {
 	}
 }
 
+namespace CARDIF {
+	u16 PORT = 0;
+	u16 UNK0 = 0xFF; // THEORY: this is actually an u16[2] and the index is decided by `CARDIF::PORT & 0x80`
+	u16 UNK1 = 0x1234;
+	u16 UNK2 = 0x1234;
+	u16 UNK3 = 0x1234;
+}
+
+#define WRIT_REG(_REG) case CARDIF_##_REG: _REG = val; break
+void CARDIF::Write16(u32 mem, u16 val) {
+	switch (mem) {
+		WRIT_REG(PORT);
+		WRIT_REG(UNK0);
+		WRIT_REG(UNK1);
+		WRIT_REG(UNK2);
+		WRIT_REG(UNK3);
+	default:
+		CARDIF_WARN("WRITE: UNKNOWN MMIO: %08X, %04X", mem, val);
+		return;
+	}
+	CARDIF_LOG("Write: %08X, %04X", mem, val);
+}
+
+#define READ_REG(_REG)case CARDIF_##_REG: ret = _REG; break
+u16 CARDIF::Read16(u32 mem) {
+	u16 ret = 0;
+	switch (mem) {
+		READ_REG(PORT);
+		READ_REG(UNK0);
+		READ_REG(UNK1);
+		READ_REG(UNK2);
+		READ_REG(UNK3);
+	default:
+		CARDIF_WARN("WRITE: UNKNOWN MMIO: %08X", mem);
+		return 0;
+	}
+	CARDIF_LOG("Read: %08X, %04X", mem, ret);
+	return ret;
+}
