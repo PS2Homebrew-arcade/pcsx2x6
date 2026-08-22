@@ -13,4 +13,5 @@ public:
     virtual bool RxByte(u8& value){return false;}
     virtual void Tick(u32 cycles) {}
     virtual bool HasData() const {return false;}
+    virtual void DoCardInput(u32 slot) {}
 };

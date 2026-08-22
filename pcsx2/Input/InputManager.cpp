@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DEV9/ACJV.h"
+#include "DEV9/ACUART.h"
 #include "ImGui/ImGuiManager.h"
 #include "Input/InputManager.h"
 #include "Input/InputSource.h"
@@ -965,6 +966,18 @@ void InputManager::AddJVSBindings(SettingsInterface& si, bool is_profile)
 		AddBindings(bindings, InputButtonEventHandler{[slot = static_cast<u32>(bi.bind_index)](s32 pressed) {
 			if (pressed > 0)
 				ACJV::InsertCoin(slot);
+		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
+	}
+
+	for (const InputBindingInfo& bi : ACJV::GetCardBindings())
+	{
+		const std::vector<std::string> bindings(si.GetStringList(ACJV::CONFIG_SECTION, bi.name));
+		if (bindings.empty())
+			continue;
+
+		AddBindings(bindings, InputButtonEventHandler{[slot = static_cast<u32>(bi.bind_index)](s32 pressed) {
+			if (pressed > 0)
+				CARDIF::InsertCard(slot);
 		}}, InputBindingInfo::Type::Button, si, ACJV::CONFIG_SECTION, bi.name, is_profile);
 	}
 

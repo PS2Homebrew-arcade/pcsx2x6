@@ -33,6 +33,7 @@ private:
 	void autoPickInputPage();
 	void bindDIPSwitchWidgets();
 	void bindSystemButtonWidgets();
+	void bindCardButtonWidgets();
 	void buildDrumPage();
 	void buildFightingPage();
 	void buildRacingPage();

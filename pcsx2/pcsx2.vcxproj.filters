@@ -891,10 +891,13 @@
       <Filter>System\Ps2\ACMMIO</Filter>
     </ClCompile>
     <ClCompile Include="DEV9\ACUART.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
+      <Filter>System\Ps2\ACUART</Filter>
     </ClCompile>
     <ClCompile Include="DEV9\ACUART_GLUE.cpp">
-      <Filter>System\Ps2\ACMMIO</Filter>
+      <Filter>System\Ps2\ACUART</Filter>
+    </ClCompile>
+    <ClCompile Include="DEV9\CARD_READER.cpp">
+      <Filter>System\Ps2\ACUART</Filter>
     </ClCompile>
     <ClCompile Include="DEV9\ACCORE.cpp">
       <Filter>System\Ps2\ACMMIO</Filter>

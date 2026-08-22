@@ -234,3 +234,8 @@ static constexpr const std::array<InputBindingInfo, 2> s_jvs_coin_bindings = {{
 	{"Coin1", TRANSLATE_NOOP("JVS", "Insert Coin P1"), nullptr, InputBindingInfo::Type::Button, 0, GenericInputBinding::Unknown},
 	{"Coin2", TRANSLATE_NOOP("JVS", "Insert Coin P2"), nullptr, InputBindingInfo::Type::Button, 1, GenericInputBinding::Unknown},
 }};
+
+static constexpr const std::array<InputBindingInfo, 2> s_cardreader_bindings = {{
+	{"InsertCard1", TRANSLATE_NOOP("CARD_READER", "Insert Card P1"), nullptr, InputBindingInfo::Type::Button, 0, GenericInputBinding::Unknown},
+	{"InsertCard2", TRANSLATE_NOOP("CARD_READER", "Insert Card P2"), nullptr, InputBindingInfo::Type::Button, 1, GenericInputBinding::Unknown},
+}};

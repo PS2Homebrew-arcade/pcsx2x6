@@ -139,6 +139,7 @@ namespace ACJV {
     std::span<const InputBindingInfo> GetButtonBindings();
     std::span<const InputBindingInfo> GetP2ButtonBindings();
     std::span<const InputBindingInfo> GetCoinBindings();
+    std::span<const InputBindingInfo> GetCardBindings(); // input bindings to emulate IC card insertions
     std::span<const InputBindingInfo> GetWheelBindings();
     std::span<const InputBindingInfo> GetDrumBindings();
     std::span<const InputBindingInfo> GetTwinstickBindings(); // Zoids

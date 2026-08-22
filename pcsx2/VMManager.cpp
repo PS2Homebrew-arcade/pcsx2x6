@@ -193,6 +193,8 @@ static std::string s_elf_override;
 static std::string s_acgame;
 static std::string s_acgame_serial;
 std::string ArcadeiLinkID;
+std::string CardImg;
+std::string s_acgame_basedir;
 static std::string s_input_profile_name;
 static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
@@ -1366,9 +1368,11 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				std::string subdir = INI.GetStringValue("data", "subdir", s_serial.c_str());
 				if (subdir != "") basedir = Path::AppendDirectory(basedir, subdir);
 				Console.WriteLnFmt(Color_Green, "ACGAME: basedir:'{}'", basedir);
+				s_acgame_basedir = basedir;
 				s_acmedia = INI.GetStringValue("data", "media");
 				s_imgname = INI.GetStringValue("data", "mediasrc", fmt::format("{}.chd", s_serial).c_str());
 				ArcadeiLinkID = INI.GetStringValue("data", "256Region", "");
+				CardImg = Path::Combine(basedir, INI.GetStringValue("data", "cardif", fmt::format("{}_card.bin", s_serial).c_str()));
 				if (!ArcadeiLinkID.empty()) {
 					if (ArcadeiLinkID != "ASIA4" && ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN") {
 						Error::SetStringFmt(error, "Invalid SYSTEM256 regional signature override! '{}'", ArcadeiLinkID);
@@ -1910,6 +1914,8 @@ void VMManager::Shutdown(bool save_resume_state)
 	s_acgame = {};
 	s_acgame_serial = {};
 	ArcadeiLinkID = {};
+	CardImg = {};
+	s_acgame_basedir = {};
 	PS2CLK = PS2CLK_DEFAULT;
 	PSXCLK = 36864000;
 	s_sys256_mode = false;

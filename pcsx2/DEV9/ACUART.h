@@ -19,3 +19,8 @@ namespace ACUART {
     extern u16 DLH;
     extern u16 FCR_SHADOW;
 }
+
+// namespace for card readers either directly accessed or via namco EXCARD PCB
+namespace CARDIF {
+    void InsertCard(u32 slot);
+}

@@ -142,6 +142,11 @@ std::span<const InputBindingInfo> ACJV::GetCoinBindings()
 	return s_jvs_coin_bindings;
 }
 
+std::span<const InputBindingInfo> ACJV::GetCardBindings()
+{
+	return s_cardreader_bindings;
+}
+
 std::span<const InputBindingInfo> ACJV::GetWheelBindings()
 {
 	return s_jvs_wheel_bindings;
@@ -278,6 +283,8 @@ void ACJV::CopyConfiguration(SettingsInterface* dest_si, const SettingsInterface
 		for (const InputBindingInfo& bi : s_jvs_p2_button_bindings)
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 		for (const InputBindingInfo& bi : s_jvs_coin_bindings)
+			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
+		for (const InputBindingInfo& bi : s_cardreader_bindings)
 			dest_si->CopyStringListValue(src_si, CONFIG_SECTION, bi.name);
 		// Peripheral binds (drum/wheel/twinstick) have no pad-mirror fallback, so they must travel with a profile too.
 		for (const InputBindingInfo& bi : s_jvs_drum_bindings)

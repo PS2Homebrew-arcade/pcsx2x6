@@ -33,7 +33,6 @@ std::unique_ptr<ACUARTDevice> ACUART::s_device;
 u16 ACUART::Read16(u32 addr) {
 	u16 r = 0;
 	const u32 reg = addr & 0xFFF;
-	ACUART_LOG("Read16  %03X", reg);
 	switch (reg) {
 	case 0x000: // RBR or DLL
 		if (ACUART::LCR & 0x80) {
@@ -68,7 +67,6 @@ u16 ACUART::Read16(u32 addr) {
 		// both set = transmitter idle, ready to accept data
 		// bit 0 = DR (RX data ready) — set while the V257 status FIFO has bytes (RRV)
 		r = 0x60 | ((s_device && s_device->HasData()) ? 0x01 : 0x00);
-		//r = 0x60 | ((s_v257RxFifo.empty()) ? 0x00 : 0x01);
 		break;
 	case 0x00C: // MSR
 		r = 0;

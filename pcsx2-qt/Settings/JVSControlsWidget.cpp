@@ -86,6 +86,7 @@ JVSControlsWidget::JVSControlsWidget(QWidget* parent, ControllerSettingsWindow* 
 
 	bindDIPSwitchWidgets();
 	bindSystemButtonWidgets();
+	bindCardButtonWidgets();
 	buildDrumPage();
 	buildFightingPage();
 	buildRacingPage();
@@ -372,6 +373,18 @@ void JVSControlsWidget::bindSystemButtonWidgets()
 	addBindRow(this, sif, layout, 7, tr("Left"),    "P1_Left",    "P2_Left");
 	addBindRow(this, sif, layout, 8, tr("Right"),   "P1_Right",   "P2_Right");
 	layout->setRowStretch(9, 1);
+}
+
+void JVSControlsWidget::bindCardButtonWidgets()
+{
+	QGridLayout* layout = m_ui.cardButtonsLayout;
+	SettingsInterface* sif = m_dialog->getProfileSettingsInterface();
+
+	// Universal inputs (same JVS bit in every game)
+	layout->addWidget(new QLabel(tr("P1"), this), 0, 1, Qt::AlignHCenter);
+	layout->addWidget(new QLabel(tr("P2"), this), 0, 2, Qt::AlignHCenter);
+	addBindRow(this, sif, layout, 1, tr("Insert IC Card"), "InsertCard1", "InsertCard2");
+	layout->setRowStretch(2, 1);
 }
 
 void JVSControlsWidget::buildDrumPage()

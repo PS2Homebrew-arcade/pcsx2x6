@@ -4,6 +4,9 @@
 #include "Config.h"
 #include "common/Console.h"
 #include <deque>
+#include <vector>
+
+#include "CARD_READER.h"
 
 #define ACUART_LOG(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.WriteLn(Color_Gray, "ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
 #define ACUART_WARN(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.Warning("ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
@@ -134,14 +137,19 @@ public:
 };
 
 
-
 bool ACUART::SetupGameHandler(const std::string& S) {
     if (S == "NM00001")
         s_device = std::make_unique<RRVHandleDevice>();
     else if (S == "NM00010" || S == "NM00015")
         s_device = std::make_unique<Bg3HandleDevice>();
+    else if (S == "NM00022" || S == "NM00021")
+        s_device = std::make_unique<ACUARTCardReader>();
     else 
         return false;
     s_device->Reset();
     return true;
+}
+
+void CARDIF::InsertCard(u32 slot) {
+    if (ACUART::s_device) ACUART::s_device->DoCardInput(slot);
 }
