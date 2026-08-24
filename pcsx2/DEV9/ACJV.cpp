@@ -447,7 +447,6 @@ JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
 {
 	if (s_racing_layouts.count(gameid))   return JVS_MODE::DRIVE;
 	if (s_fighting_layouts.count(gameid)) return JVS_MODE::FIGHTING;
-	if (s_standard_layouts.count(gameid)) return JVS_MODE::STANDARD;
 	if (s_gun_mappings.count(gameid))     return JVS_MODE::LIGHTGUN;
 	if (std::ranges::find(s_drum_games, gameid) != std::ranges::end(s_drum_games))
 		return JVS_MODE::DRUM;
@@ -455,6 +454,7 @@ JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
 		return JVS_MODE::TWINSTICK;
 	if (std::ranges::find(s_touch_games, gameid) != std::ranges::end(s_touch_games))
 		return JVS_MODE::TOUCH;
+	if (s_standard_layouts.count(gameid)) return JVS_MODE::STANDARD;
 	return JVS_MODE::DEFAULT;
 }
 
