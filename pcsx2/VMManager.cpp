@@ -191,6 +191,7 @@ static std::pair<u32, u32> s_elf_text_range;
 static bool s_elf_executed = false;
 static std::string s_elf_override;
 static std::string s_acgame;
+static std::string s_acgame_data_directory;
 static std::string s_acgame_serial;
 std::string ArcadeiLinkID;
 static std::string s_input_profile_name;
@@ -344,6 +345,12 @@ std::string VMManager::GetDiscPath()
 {
 	std::unique_lock lock(s_info_mutex);
 	return CDVDsys_GetFile(CDVDsys_GetSourceType());
+}
+
+std::string VMManager::GetArcadeGameDataDirectory()
+{
+	std::unique_lock lock(s_info_mutex);
+	return s_acgame_data_directory;
 }
 
 std::string VMManager::GetDiscSerial()
@@ -1486,6 +1493,11 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				Console.WriteLnFmt(Color_Green, "ACGAME: sram:'{}'", ACSRAM::filepath);
 				Console.WriteLnFmt(Color_Green, "ACGAME: media:'{}'", ACATA::imgpath);
 
+				{
+					std::unique_lock lock(s_info_mutex);
+					s_acgame_data_directory = std::move(basedir);
+				}
+
 				return true;
 			}
 		}
@@ -1918,6 +1930,7 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	{
 		std::unique_lock lock(s_info_mutex);
+		s_acgame_data_directory = {};
 		ClearDiscDetails();
 	}
 

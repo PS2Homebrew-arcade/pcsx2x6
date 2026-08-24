@@ -91,6 +91,9 @@ namespace VMManager
 	/// Returns the path of the disc currently running.
 	std::string GetDiscPath();
 
+	/// Returns the data directory from the current arcade game config.
+	std::string GetArcadeGameDataDirectory();
+
 	/// Returns the serial of the disc currently running.
 	std::string GetDiscSerial();
 
