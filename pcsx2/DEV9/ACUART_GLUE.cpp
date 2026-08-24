@@ -142,6 +142,7 @@ bool ACUART::SetupGameHandler(const std::string& S) {
         s_device = std::make_unique<Bg3HandleDevice>();
     else 
         return false;
+    ResetTransmitState();
     s_device->Reset();
     return true;
 }
