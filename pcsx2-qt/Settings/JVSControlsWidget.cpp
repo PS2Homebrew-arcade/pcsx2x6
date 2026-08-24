@@ -484,7 +484,7 @@ static void buildJvsLayoutPage(JVSControlsWidget* self, SettingsInterface* sif, 
 			note->setStyleSheet("font-style: italic;");
 			g->addWidget(note, row++, 0, 1, 3);
 		}
-		grid->addWidget(group, idx / 2, idx % 2);
+		grid->addWidget(group, idx / 2, idx % 2, Qt::AlignTop);
 		idx++;
 	}
 	pageLayout->addLayout(grid);
