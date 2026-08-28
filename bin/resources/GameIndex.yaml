@@ -198,9 +198,13 @@ NM00028:
   bootprog: DRULOAD
   media: DVD
   input: touchscreen
+  gsHWFixes:
+    deinterlace: 1 # The patch selects the full-height progressive video path.
   patches:
     default:
       content: |-
+        comment=Use full-height progressive video
+        patch=1,EE,004016C0,word,24100010
         comment=Set the Tower IP address (change the values to match your address)
         // The default values keep the game's original address, 192.168.33.20.
         // ASCII bytes: 0 = 0x30, 1 = 0x31, 2 = 0x32, 3 = 0x33, 4 = 0x34.
