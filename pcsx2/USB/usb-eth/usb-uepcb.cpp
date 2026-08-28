@@ -255,12 +255,14 @@ namespace usb_uepcb
 	// [2-byte LE length = frame length + 8][frame][8 zero bytes].
 	static std::vector<u8> to_bulkin(const u8* eth, int len)
 	{
+		const int padded_len = std::max(len, 60);
 		std::vector<u8> v;
-		v.reserve(2 + len + 8);
-		const int p = len + 8;
+		v.reserve(2 + padded_len + 8);
+		const int p = padded_len + 8;
 		v.push_back(static_cast<u8>(p & 0xFF));
 		v.push_back(static_cast<u8>((p >> 8) & 0xFF));
 		v.insert(v.end(), eth, eth + len);
+		v.insert(v.end(), padded_len - len, 0);
 		v.insert(v.end(), 8, 0);
 		return v;
 	}
