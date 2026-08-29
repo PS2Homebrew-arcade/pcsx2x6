@@ -902,8 +902,11 @@ std::string VMManager::GetDebuggerSettingsFilePathForCurrentGame()
 	return GetDebuggerSettingsFilePath(s_disc_serial, s_current_crc);
 }
 
-static u32 GetCRCForPatches()
+static std::optional<u32> GetCRCForPatches()
 {
+	if (!VMManager::HasBootedELF())
+		return std::nullopt;
+
 	return s_acgame.empty() ? s_current_crc : 0; // arcade: patches are keyed by the gameid alone
 }
 
@@ -1219,7 +1222,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 	ApplySettings();
 
 	// Patches are game-dependent, thus should get applied after game settings ia loaded.
-	Patch::ReloadPatches(GetSerialForGameSettings(), HasBootedELF() ? GetCRCForPatches() : 0, true, true, false, false);
+	Patch::ReloadPatches(GetSerialForGameSettings(), GetCRCForPatches(), true, true, false, false);
 
 	ReportGameChangeToHost();
 	if (MTGS::IsOpen())
@@ -1256,7 +1259,7 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	Achievements::GameChanged(s_disc_crc, crc_to_report);
 
 	Console.WriteLn(Color_StrongOrange, fmt::format("ELF changed, active CRC {:08X} ({})", crc_to_report, s_elf_path));
-	Patch::ReloadPatches(GetSerialForGameSettings(), HasBootedELF() ? GetCRCForPatches() : 0, false, false, false, verbose_patches_if_changed);
+	Patch::ReloadPatches(GetSerialForGameSettings(), GetCRCForPatches(), false, false, false, verbose_patches_if_changed);
 	ApplyCoreSettings();
 }
 
@@ -3116,7 +3119,7 @@ void VMManager::Internal::ELFLoadingOnCPUThread(std::string elf_path)
 	// Remove patches, if we're changing games, we don't want to be applying the patch for the old game while it's loading.
 	if (!was_running_bios)
 	{
-		Patch::ReloadPatches(GetSerialForGameSettings(), 0, false, false, false, true);
+		Patch::ReloadPatches(GetSerialForGameSettings(), std::nullopt, false, false, false, true);
 		ApplyCoreSettings();
 	}
 }
@@ -3432,7 +3435,8 @@ void VMManager::ReloadPatches(bool reload_files, bool reload_enabled_list, bool 
 	if (!HasValidVM())
 		return;
 
-	Patch::ReloadPatches(GetSerialForGameSettings(), HasBootedELF() ? GetCRCForPatches() : 0, reload_files, reload_enabled_list, verbose, verbose_if_changed);
+	Patch::ReloadPatches(GetSerialForGameSettings(), GetCRCForPatches(), reload_files, reload_enabled_list, verbose,
+		verbose_if_changed);
 
 	// Might change widescreen mode.
 	if (Patch::ReloadPatchAffectingOptions())
