@@ -29,6 +29,38 @@ u16 ACUART::DLL = 0;
 u16 ACUART::DLH = 0;
 u16 ACUART::FCR_SHADOW = 0;
 std::unique_ptr<ACUARTDevice> ACUART::s_device;
+static bool s_tx_ready = true;
+static bool s_tx_interrupt_pending = false;
+
+void ACUART::ResetTransmitState()
+{
+	s_tx_ready = true;
+	s_tx_interrupt_pending = false;
+}
+
+void ACUART::RefreshInterruptLine()
+{
+	const bool rx_interrupt_pending = (IER & 0x01) && s_device && s_device->HasData();
+	const bool tx_interrupt_pending = (IER & 0x02) && s_tx_interrupt_pending;
+	if (rx_interrupt_pending || tx_interrupt_pending)
+		ACCORE::intr(ACCORE::INTRN_UART);
+}
+
+void ACUART::Tick(u32 cycles)
+{
+	if (!s_tx_ready)
+	{
+		s_tx_ready = true;
+		if (IER & 0x02)
+		{
+			s_tx_interrupt_pending = true;
+			RefreshInterruptLine();
+		}
+	}
+
+	if (s_device)
+		s_device->Tick(cycles);
+}
 
 u16 ACUART::Read16(u32 addr) {
 	u16 r = 0;
@@ -54,7 +86,15 @@ u16 ACUART::Read16(u32 addr) {
 			r = ACUART::IER;
 		break;
 	case 0x004: // IIR (read-only)
-		r = 0x01; // no interrupt pending, 16550 mode
+		if ((IER & 0x01) && s_device && s_device->HasData())
+			r = 0x04; // RX data available
+		else if ((IER & 0x02) && s_tx_interrupt_pending)
+		{
+			r = 0x02; // TX holding register empty
+			s_tx_interrupt_pending = false;
+		}
+		else
+			r = 0x01; // no interrupt pending, 16550 mode
 		break;
 	case 0x006: // LCR
 		r = ACUART::LCR;
@@ -67,7 +107,7 @@ u16 ACUART::Read16(u32 addr) {
 		// bit 6 = TEMT (TX shift register empty)
 		// both set = transmitter idle, ready to accept data
 		// bit 0 = DR (RX data ready) — set while the V257 status FIFO has bytes (RRV)
-		r = 0x60 | ((s_device && s_device->HasData()) ? 0x01 : 0x00);
+		r = (s_tx_ready ? 0x60 : 0x00) | ((s_device && s_device->HasData()) ? 0x01 : 0x00);
 		//r = 0x60 | ((s_v257RxFifo.empty()) ? 0x00 : 0x01);
 		break;
 	case 0x00C: // MSR
@@ -91,6 +131,8 @@ void ACUART::Write16(u32 addr, u16 val) {
 		if (ACUART::LCR & 0x80)
 			ACUART::DLL = val;
 		else {
+			s_tx_ready = false;
+			s_tx_interrupt_pending = false;
 			ACUART_LOG("TX:%02X", val);
 			if (s_device)
 				s_device->TxByte((u8)val);
@@ -100,10 +142,22 @@ void ACUART::Write16(u32 addr, u16 val) {
 		if (ACUART::LCR & 0x80)
 			ACUART::DLH = val;
 		else
+		{
+			const u16 old_ier = ACUART::IER;
 			ACUART::IER = val;
+			if (!(val & 0x02))
+				s_tx_interrupt_pending = false;
+			else if (!(old_ier & 0x02) && s_tx_ready)
+			{
+				s_tx_interrupt_pending = true;
+				RefreshInterruptLine();
+			}
+		}
 		break;
 	case 0x004: // FCR (write-only) — val=7 on module stop: enable FIFO + reset RX/TX (acUartModuleStop)
 		ACUART::FCR_SHADOW = val & 0xC9; // preserve trigger level + enable bits
+		if (val & 0x04)
+			ResetTransmitState();
 		break;
 	case 0x006: // LCR
 		ACUART::LCR = val;
