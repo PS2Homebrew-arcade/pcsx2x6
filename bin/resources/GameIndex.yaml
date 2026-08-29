@@ -198,6 +198,27 @@ NM00028:
   bootprog: DRULOAD
   media: DVD
   input: touchscreen
+  gsHWFixes:
+    deinterlace: 1 # The patch selects the full-height progressive video path.
+  patches:
+    default:
+      content: |-
+        comment=Use full-height progressive video
+        patch=1,EE,004016C0,word,24100010
+        comment=Run at 60 frames per second
+        patch=1,EE,00127DD0,word,2405003C
+        patch=1,EE,00128340,word,2405003C
+        comment=Set the Tower IP address (change the values to match your address)
+        // The default values keep the game's original address, 192.168.33.20.
+        // ASCII bytes: 0 = 0x30, 1 = 0x31, 2 = 0x32, 3 = 0x33, 4 = 0x34.
+        // ASCII bytes: 5 = 0x35, 6 = 0x36, 7 = 0x37, 8 = 0x38, 9 = 0x39, . = 0x2E.
+        // Split the address into four-character groups and reverse the byte order in each group.
+        // Pad the final group with 0x00 bytes before you reverse it.
+        // Example: 192.168.33.20 becomes 2E323931, 2E383631, 322E3333, 00000030.
+        patch=1,EE,00465560,word,2E323931
+        patch=1,EE,00465564,word,2E383631
+        patch=1,EE,00465568,word,322E3333
+        patch=1,EE,0046556C,word,00000030
 NM00029:
   name: Kinnikuman Muscle Grand Prix
   region: System256
