@@ -6,6 +6,7 @@
 #include "USB/qemu-usb/USBinternal.h"
 #include "USB/usb-eth/usb-uepcb.h"
 #include "USB/USB.h"
+#include "DEV9/sockets.h"
 #include "common/Console.h"
 #include "StateWrapper.h"
 #include "IopMem.h" // runtime IOP-side patches for the game's network stack (see uepcb_handle_data)
@@ -16,6 +17,7 @@
 #include <atomic>
 #include <chrono>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <random>
 #include <string>
@@ -99,6 +101,7 @@ namespace usb_uepcb
 		std::atomic<bool> peer_stop{false};
 		std::mutex peers_lock;
 		std::vector<socket_t> peers; // host: all joined peers / join: 1 hub connection
+		std::unique_ptr<SocketAdapter> internet_adapter;
 	} UePcbState;
 
 	// ---------------- peer transport helpers ----------------
@@ -794,6 +797,11 @@ namespace usb_uepcb
 					int n = std::min<int>(total, (int)sizeof(buf));
 					std::memcpy(buf, s->tx_accum.data(), n);
 					s->tx_accum.erase(s->tx_accum.begin(), s->tx_accum.begin() + total);
+					if (s->internet_adapter)
+					{
+						NetPacket packet(buf + 2, ethlen);
+						s->internet_adapter->send(&packet);
+					}
 					peer_send_all(s, buf + 2, ethlen);
 					static int g_oe = 0;
 					if (g_oe++ < 40 || (g_oe % 200) == 0)
@@ -804,6 +812,12 @@ namespace usb_uepcb
 			}
 			case USB_TOKEN_IN:
 			{
+				if (ep == 1 && s->internet_adapter)
+				{
+					NetPacket packet;
+					if (s->internet_adapter->recv(&packet))
+						push_in_q(s, to_bulkin(reinterpret_cast<const u8*>(packet.buffer), packet.size));
+				}
 				// BULK IN (EP1) / INT IN (EP3): deliver one queued inbound
 				// frame if available.
 				std::vector<u8> frame;
@@ -902,6 +916,18 @@ namespace usb_uepcb
 				s->mac[4] = static_cast<u8>((r >> 8) & 0xFF);
 				s->mac[5] = static_cast<u8>((r >> 16) & 0xFF);
 			}
+
+			if (USB::GetConfigBool(si, port, TypeName(), "HostNetwork", false))
+			{
+				PacketReader::MAC_Address guest_mac;
+				std::memcpy(guest_mac.bytes, s->mac, sizeof(s->mac));
+				s->internet_adapter = std::make_unique<SocketAdapter>("Auto", &guest_mac, true);
+				if (!s->internet_adapter->isInitialised())
+				{
+					Console.Error("UePCB: failed to initialize the host network adapter");
+					s->internet_adapter.reset();
+				}
+			}
 		}
 		s->dev.speed = USB_SPEED_FULL;
 		s->desc.full = &s->desc_dev;
@@ -951,6 +977,12 @@ namespace usb_uepcb
 	{
 		// Stored under [USB1] UePcb_*.
 		static const SettingInfo settings[] = {
+			{.type = SettingInfo::Type::Boolean,
+				.name = "HostNetwork",
+				.display_name = "Connect to host network",
+				.description = "Allow the emulated UE PCB to connect to devices and services using your computer's local "
+							   "network or Internet connection. The device uses the IP address, subnet mask, and gateway from the PCSX2 network settings.",
+				.default_value = "false"},
 			{.type = SettingInfo::Type::String,
 				.name = "PeerIP",
 				.display_name = "1P's IP (same value on every PC)",

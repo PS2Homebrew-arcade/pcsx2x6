@@ -37,7 +37,8 @@ class SocketAdapter : public NetAdapter
 	std::mutex deleteRecvSentry;
 
 public:
-	SocketAdapter();
+	explicit SocketAdapter(const char* adapter_override = nullptr,
+		const PacketReader::MAC_Address* guest_mac = nullptr, bool use_configured_network = false);
 	virtual bool blocks();
 	virtual bool isInitialised();
 	//gets a packet.rv :true success

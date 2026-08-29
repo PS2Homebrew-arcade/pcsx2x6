@@ -28,6 +28,8 @@
 #include "Sessions/UDP_Session/UDP_FixedPort.h"
 #include "Sessions/UDP_Session/UDP_Session.h"
 
+#include <cstring>
+
 #include "PacketReader/EthernetFrame.h"
 #include "PacketReader/ARP/ARP_Packet.h"
 #include "PacketReader/IP/ICMP/ICMP_Packet.h"
@@ -106,16 +108,17 @@ AdapterOptions SocketAdapter::GetAdapterOptions()
 	return (AdapterOptions::DHCP_ForcedOn | AdapterOptions::DHCP_OverrideIP | AdapterOptions::DHCP_OverideSubnet | AdapterOptions::DHCP_OverideGateway);
 }
 
-SocketAdapter::SocketAdapter()
+SocketAdapter::SocketAdapter(const char* adapter_override, const MAC_Address* guest_mac, bool use_configured_network)
 {
 	bool foundAdapter;
+	const std::string adapter_name = adapter_override ? adapter_override : EmuConfig.DEV9.EthDevice;
 
 	AdapterUtils::Adapter adapter;
 	AdapterUtils::AdapterBuffer buffer;
 
-	if (strcmp(EmuConfig.DEV9.EthDevice.c_str(), "Auto") != 0)
+	if (adapter_name != "Auto")
 	{
-		foundAdapter = AdapterUtils::GetAdapter(EmuConfig.DEV9.EthDevice, &adapter, &buffer);
+		foundAdapter = AdapterUtils::GetAdapter(adapter_name, &adapter, &buffer);
 
 		if (!foundAdapter)
 		{
@@ -147,14 +150,34 @@ SocketAdapter::SocketAdapter()
 	//For DHCP, we need to override some settings
 	//DNS settings as per direct adapters
 
-	const IP_Address ps2IP{{{internalIP.bytes[0], internalIP.bytes[1], internalIP.bytes[2], 100}}};
-	const IP_Address subnet{{{255, 255, 255, 0}}};
-	const IP_Address gateway = internalIP;
+	IP_Address ps2IP{{{internalIP.bytes[0], internalIP.bytes[1], internalIP.bytes[2], 100}}};
+	IP_Address subnet{{{255, 255, 255, 0}}};
+	IP_Address gateway = internalIP;
+	if (use_configured_network)
+	{
+		IP_Address configured_ip{};
+		IP_Address configured_subnet{};
+		IP_Address configured_gateway{};
+		std::memcpy(configured_ip.bytes, EmuConfig.DEV9.PS2IP, sizeof(configured_ip.bytes));
+		std::memcpy(configured_subnet.bytes, EmuConfig.DEV9.Mask, sizeof(configured_subnet.bytes));
+		std::memcpy(configured_gateway.bytes, EmuConfig.DEV9.Gateway, sizeof(configured_gateway.bytes));
+		if (configured_ip.integer != 0)
+			ps2IP = configured_ip;
+		if (!EmuConfig.DEV9.AutoMask && configured_subnet.integer != 0)
+			subnet = configured_subnet;
+		if (!EmuConfig.DEV9.AutoGateway && configured_gateway.integer != 0)
+			gateway = configured_gateway;
+	}
 
 	InitInternalServer(&adapter, true, ps2IP, subnet, gateway);
 
 	std::optional<MAC_Address> adMAC = AdapterUtils::GetAdapterMAC(&adapter);
-	if (adMAC.has_value())
+	if (guest_mac)
+	{
+		MAC_Address configured_mac = *guest_mac;
+		SetMACAddress(&configured_mac);
+	}
+	else if (adMAC.has_value())
 	{
 		MAC_Address hostMAC = adMAC.value();
 		MAC_Address newMAC = ps2MAC;
