@@ -46,12 +46,12 @@ std::string GameDatabaseSchema::GameEntry::memcardFiltersAsString() const
 	return fmt::to_string(fmt::join(memcardFilters, "/"));
 }
 
-const std::string* GameDatabaseSchema::GameEntry::findPatch(u32 crc) const
+const std::string* GameDatabaseSchema::GameEntry::findPatch(std::optional<u32> crc) const
 {
-	if (crc == 0)
+	if (!crc.has_value())
 		return nullptr;
 
-	auto it = patches.find(crc);
+	auto it = patches.find(*crc);
 	if (it != patches.end())
 		return &it->second;
 
