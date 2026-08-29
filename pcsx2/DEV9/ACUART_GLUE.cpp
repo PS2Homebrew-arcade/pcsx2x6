@@ -1,9 +1,12 @@
 #include "ACUART_GLUE.h"
 #include "ACUART.h"
+#include "ACDruagaCardReader.h"
 #include "ACCORE.h"
 #include "Config.h"
 #include "common/Console.h"
 #include <deque>
+#include <optional>
+#include <vector>
 
 #define ACUART_LOG(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.WriteLn(Color_Gray, "ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
 #define ACUART_WARN(fmt, ...) if (EmuConfig.Arcade.UARTVerbose) Console.Warning("ACUART:" fmt __VA_OPT__(,) __VA_ARGS__)
@@ -134,12 +137,82 @@ public:
 };
 
 
+class DruagaReaderDevice : public ACUARTDevice
+{
+private:
+    // The ACUART driver defaults to 9600 baud and 8N1 framing. One character takes
+    // 10 / 9600 seconds, or approximately 1.04 ms. In this path, 240 DEV9 update ticks
+    // take approximately 2 ms. This delay gives the UART about two character times to
+    // report transmit completion before it delivers the reader reply.
+    //
+    // This is a compatibility delay, not an exact hardware-cycle conversion. DEV9async()
+    // passes a constant tick instead of elapsed IOP cycles. The shared ACUART core also
+    // does not emulate its 16-byte FIFO, shift-register timing, or separate TX and RX
+    // interrupt state. Baud-based timing requires shared changes and live verification
+    // for all current ACUART devices.
+    static constexpr u32 REPLY_DELAY_TICKS = 240;
+
+    std::deque<u8> fifo;
+    std::optional<std::vector<u8>> pendingReply;
+    u32 replyDelay = 0;
+
+public:
+    void Reset() override
+    {
+        fifo.clear();
+        pendingReply.reset();
+        replyDelay = 0;
+        ACDruagaCardReader::Reset();
+    }
+
+    void TxByte(u8 value) override
+    {
+        ACDruagaCardReader::WriteByte(value);
+        if (!pendingReply.has_value())
+        {
+            pendingReply = ACDruagaCardReader::TakeReply();
+            if (pendingReply.has_value())
+                replyDelay = 0;
+        }
+    }
+
+    bool RxByte(u8& value) override
+    {
+        if (fifo.empty())
+            return false;
+        value = fifo.front();
+        fifo.pop_front();
+        return true;
+    }
+
+    bool HasData() const override
+    {
+        return !fifo.empty();
+    }
+
+    void Tick(u32 cycles) override
+    {
+        if (!fifo.empty() || !pendingReply.has_value())
+            return;
+        replyDelay += cycles;
+        if (replyDelay < REPLY_DELAY_TICKS)
+            return;
+        replyDelay = 0;
+        fifo.insert(fifo.end(), pendingReply->begin(), pendingReply->end());
+        pendingReply.reset();
+        ACCORE::intr(ACCORE::INTRN_UART);
+    }
+};
+
+
 
 bool ACUART::SetupGameHandler(const std::string& S) {
     if (S == "NM00001")
         s_device = std::make_unique<RRVHandleDevice>();
     else if (S == "NM00010" || S == "NM00015")
         s_device = std::make_unique<Bg3HandleDevice>();
+    else if (S == "NM00028")
+        s_device = std::make_unique<DruagaReaderDevice>();
     else 
         return false;
     ResetTransmitState();
