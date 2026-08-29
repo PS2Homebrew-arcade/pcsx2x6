@@ -220,6 +220,9 @@ static constexpr InputBindingInfo s_standard_gundamquiz[] = {
 	{"GundamQuiz_Melee",  TRANSLATE_NOOP("JVS", "Answer C"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_2, GenericInputBinding::Triangle},
 	{"GundamQuiz_Jump",   TRANSLATE_NOOP("JVS", "Answer D"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_3, GenericInputBinding::Cross},
 };
+static constexpr InputBindingInfo s_standard_druaga[] = {
+	{"Druaga_Attack", TRANSLATE_NOOP("JVS", "Attack"), nullptr, InputBindingInfo::Type::Button, JVS_BTN_2, GenericInputBinding::Cross},
+};
 
 // Standard page: section title + action buttons per layout.
 static constexpr ACJV::LayoutInfo s_standard_layout_ui[] = {
@@ -228,6 +231,7 @@ static constexpr ACJV::LayoutInfo s_standard_layout_ui[] = {
 	{"Necchuu! Pro Yakyuu 2002",   s_standard_baseball,    false},
 	{"Gundam Quiz Warrior",        s_standard_gundamquiz,  false},
 	{"Quiz Suku Suku Inufuku 2",   s_standard_inufuku,     false, TRANSLATE_NOOP("JVS", "Answer buttons 1-4 sit on the Up/Down/Left/Right switches")},
+	{"Druaga Online",              s_standard_druaga,      true},
 };
 
 static constexpr const std::array<InputBindingInfo, 2> s_jvs_coin_bindings = {{

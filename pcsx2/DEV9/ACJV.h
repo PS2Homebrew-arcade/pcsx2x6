@@ -74,6 +74,7 @@ enum class StandardLayout {
 	TECHNICBEAT, // NM10003: Technic Beat (3 buttons)
 	GUNDAMQUIZ,  // NM00030: Gundam Quiz Warrior (4-button Gundam wiring)
 	INUFUKU,     // NM00037: Quiz Inufuku 2 (answer buttons 1-4 on the directional bits)
+	DRUAGA,      // NM00028: Druaga Online (physical attack button on Sw2)
 };
 
 #define JVS_WHEEL_CHANNEL_MAX 3
