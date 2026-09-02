@@ -484,8 +484,8 @@ namespace Sessions
 					else
 					{
 #if defined(ICMP_SOCKETS_LINUX)
-						Console.Error("DEV9: ICMP: Unexpected packet");
-						pxAssert(false);
+						// A raw Linux ICMP socket can receive a copy of an echo request
+						// that it just sent.
 #endif
 						// Assume not for us
 						return nullptr;
