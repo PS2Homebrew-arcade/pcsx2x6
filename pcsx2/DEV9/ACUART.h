@@ -8,6 +8,9 @@
 
 namespace ACUART {
     bool SetupGameHandler(const std::string& S);
+    void ResetTransmitState();
+    void RefreshInterruptLine();
+    void Tick(u32 cycles);
     u16 Read16(u32 addr);
     void Write16(u32 addr, u16 val);
     extern std::unique_ptr<ACUARTDevice> s_device;
