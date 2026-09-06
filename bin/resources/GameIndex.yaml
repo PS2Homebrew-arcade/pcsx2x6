@@ -58,8 +58,14 @@ NM00007:
   bootprog: SCSLOAD
   media: DVD
   input: button
+  clampModes:
+    vuClampMode: 2 # Respawn issues, Fixes SPS, avoids teleporting characters.
+  gameFixes:
+    - EETimingHack # Fixes bad colours on character select when in Progressive Scan.
+    - SoftwareRendererFMVHack # Horizontal bottom line in FMV.
   gsHWFixes:
-    alignSprite: 1
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 2 # Fixes misaligned bloom
 NM00008:
   name: Wangan Midnight
   region: System246
@@ -138,8 +144,18 @@ NM00019:
   bootprog: TK5LOAD
   media: DVD
   input: button
+  clampModes:
+  eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
-    alignSprite: 1
+    recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
+    halfPixelOffset: 2 # Align post.
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 1 # Fixes depth of field effect.
+    textureInsideRT: 1 # Fixes heat haze half screen problem.
+    cpuSpriteRenderBW: 1
+    getSkipCount: "GSC_NamcoGames"
+    bilinearDirtyUpscale: 1 # Fixed the issue where a sphere would appear as a cube when backlit.
+    autoFlush: 1
 NM00020:
   name: Dragon Chronicle Online - Great Sky Battle
   region: System246
@@ -184,8 +200,18 @@ NM00026:
   bootprog: T55LOAD
   media: DVD
   input: button
+  clampModes:
+  eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
-    alignSprite: 1
+    recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
+    halfPixelOffset: 2 # Align post.
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 1 # Fixes depth of field effect.
+    textureInsideRT: 1 # Fixes heat haze half screen problem.
+    cpuSpriteRenderBW: 1
+    getSkipCount: "GSC_NamcoGames"
+    bilinearDirtyUpscale: 1 # Fixes the issue where a sphere would appear as a cube when backlit.
+    autoFlush: 1
 NM00027:
   name: Super Dragon Ball Z
   region: System256
@@ -383,3 +409,4 @@ NM00057:
   input: drum
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
+    
