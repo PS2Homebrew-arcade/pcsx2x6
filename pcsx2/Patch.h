@@ -20,6 +20,7 @@
 #include "common/MemoryInterface.h"
 #include "common/SmallString.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -159,7 +160,8 @@ namespace Patch
 	extern std::string GetPnachFilename(const std::string_view serial, u32 crc, bool cheats);
 
 	/// Reloads cheats/patches. If verbose is set, the number of patches loaded will be shown in the OSD.
-	extern void ReloadPatches(const std::string& serial, u32 crc, bool reload_files, bool reload_enabled_list, bool verbose, bool verbose_if_changed);
+	extern void ReloadPatches(const std::string& serial, std::optional<u32> crc, bool reload_files, bool reload_enabled_list, bool verbose,
+		bool verbose_if_changed);
 
 	extern void UpdateActivePatches(bool reload_enabled_list, bool verbose, bool verbose_if_changed, bool apply_new_patches);
 	extern void ApplyPatchSettingOverrides();

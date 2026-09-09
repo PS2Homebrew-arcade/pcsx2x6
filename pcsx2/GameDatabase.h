@@ -116,7 +116,7 @@ namespace GameDatabaseSchema
 		}arcade;
 		// Returns the list of memory card serials as a `/` delimited string
 		std::string memcardFiltersAsString() const;
-		const std::string* findPatch(u32 crc) const;
+		const std::string* findPatch(std::optional<u32> crc) const;
 		const char* compatAsString() const;
 
 		/// Applies Core game fixes to an existing config.

@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <type_traits>
@@ -137,7 +138,7 @@ namespace Patch
 	static std::vector<std::string> s_enabled_patches;
 	static std::vector<std::string> s_just_enabled_cheats;
 	static std::vector<std::string> s_just_enabled_patches;
-	static u32 s_patches_crc;
+	static std::optional<u32> s_patches_crc;
 	static std::optional<float> s_override_aspect_ratio;
 	static std::optional<GSInterlaceMode> s_override_interlace_mode;
 
@@ -728,7 +729,7 @@ u32 Patch::EnablePatches(const std::vector<PatchGroup>* patches, const std::vect
 	return count;
 }
 
-void Patch::ReloadPatches(const std::string& serial, u32 crc, bool reload_files, bool reload_enabled_list, bool verbose,
+void Patch::ReloadPatches(const std::string& serial, std::optional<u32> crc, bool reload_files, bool reload_enabled_list, bool verbose,
 	bool verbose_if_changed)
 {
 	reload_files |= (s_patches_crc != crc);
@@ -754,7 +755,7 @@ void Patch::ReloadPatches(const std::string& serial, u32 crc, bool reload_files,
 
 		s_game_patches.clear();
 		EnumeratePnachFiles(
-			serial, s_patches_crc, false, false, [](const std::string& filename, const std::string& pnach_data) {
+			serial, s_patches_crc.value_or(0), false, false, [](const std::string& filename, const std::string& pnach_data) {
 				const u32 patch_count = LoadPatchesFromString(&s_game_patches, pnach_data);
 				if (patch_count > 0)
 					Console.WriteLn(Color_Green, fmt::format("Found {} game patches in {}.", patch_count, filename));
@@ -762,7 +763,7 @@ void Patch::ReloadPatches(const std::string& serial, u32 crc, bool reload_files,
 
 		s_cheat_patches.clear();
 		EnumeratePnachFiles(
-			serial, s_patches_crc, true, false, [](const std::string& filename, const std::string& pnach_data) {
+			serial, s_patches_crc.value_or(0), true, false, [](const std::string& filename, const std::string& pnach_data) {
 				const u32 patch_count = LoadPatchesFromString(&s_cheat_patches, pnach_data);
 				if (patch_count > 0)
 					Console.WriteLn(Color_Green, fmt::format("Found {} cheats in {}.", patch_count, filename));
@@ -886,7 +887,7 @@ void Patch::UnloadPatches()
 {
 	s_override_interlace_mode = {};
 	s_override_aspect_ratio = {};
-	s_patches_crc = 0;
+	s_patches_crc.reset();
 	s_active_patches = {};
 	s_active_pnach_dynamic_patches = {};
 	s_active_gamedb_dynamic_patches = {};
