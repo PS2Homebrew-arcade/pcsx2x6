@@ -1,6 +1,7 @@
 #include "DEV9.h"
 #include "IopDma.h"
 #include "ACCORE.h"
+#include "ACUART.h"
 #include "ACJV.h"
 #include "ACMACROS.h"
 #include "common/Console.h"
@@ -17,7 +18,7 @@ u16 ACCORE::Read16(u32 mem) {
 	case 0x1241C000:
 		// Console.Error("%-16s %08X: %04X", __FUNCTION__, mem, INTR_REG);
     	return INTR_REG; // ACRAM will wait 0xFFFFF times for this to not have 0x1000 bitmask set. also used inside intr_intr (interrup handler 13 declared on accore)
-    
+
     break;
     default: Console.Error("%-16s %08X:  %04X", "ACUNK::Read16", mem, 0); return 0;
     }
@@ -87,6 +88,7 @@ void ACCORE::Interrupt(u32 mem, u16 v) {
 		break;
 	case ACCORE_INTR_UART:
 		CLRB(INTR_REG, CAUS_UART); // acknowledge the UART RX interrupt (clear its cause bit)
+		ACUART::RefreshInterruptLine();
 		break;
 	default:
 		Console.Warning("ACCORE: unknown INTR write to: %08X", mem);

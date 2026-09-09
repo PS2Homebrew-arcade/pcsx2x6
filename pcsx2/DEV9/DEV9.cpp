@@ -106,6 +106,7 @@ s32 DEV9init()
 	DevCon.WriteLn("DEV9: DEV9init");
 
 	memset(&dev9, 0, sizeof(dev9));
+	ACUART::ResetTransmitState();
 	dev9.ata = new ATA();
 	DevCon.WriteLn("DEV9: DEV9init2");
 
@@ -1174,7 +1175,7 @@ void DEV9async(u32 cycles)
 {
 	//smap_async(cycles);
 	//dev9.ata->Async(cycles);
-	if (ACUART::s_device) ACUART::s_device->Tick(cycles);
+	ACUART::Tick(cycles);
 	ACJV::UpdateFcaFrame();     // ...and free-run the FCA-1 input frame
 }
 
