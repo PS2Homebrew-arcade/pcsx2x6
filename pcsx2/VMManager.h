@@ -91,6 +91,21 @@ namespace VMManager
 	/// Returns the path of the disc currently running.
 	std::string GetDiscPath();
 
+	/// Returns the data directory from the current arcade game config.
+	std::string GetArcadeGameDataDirectory();
+
+	/// Returns the selected IC card number.
+	u8 GetSelectedICCard();
+
+	/// Selects the previous IC card number and returns it.
+	u8 SelectPreviousICCard();
+
+	/// Selects the next IC card number and returns it.
+	u8 SelectNextICCard();
+
+	/// Inserts an IC card into the current game's card reader. Returns true if the card was inserted.
+	bool InsertICCard(u8 card);
+
 	/// Returns the serial of the disc currently running.
 	std::string GetDiscSerial();
 

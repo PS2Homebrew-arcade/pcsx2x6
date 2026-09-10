@@ -117,6 +117,22 @@ static void HotkeySaveStateSlot(s32 slot)
 	});
 }
 
+static void HotkeySelectICCard(bool next)
+{
+	const u8 card = next ? VMManager::SelectNextICCard() : VMManager::SelectPreviousICCard();
+	Host::AddIconOSDMessage("SelectICCard", ICON_FA_ID_CARD,
+		fmt::format(TRANSLATE_FS("Hotkeys", "Selected IC card {}."), card), Host::OSD_QUICK_DURATION);
+}
+
+static void HotkeyInsertICCard(u8 card)
+{
+	const bool inserted = VMManager::InsertICCard(card);
+	Host::AddIconOSDMessage("InsertICCard", ICON_FA_ID_CARD,
+		fmt::format(inserted ? TRANSLATE_FS("Hotkeys", "Inserted IC card {}.") :
+			TRANSLATE_FS("Hotkeys", "Could not insert IC card {}."), card),
+		Host::OSD_QUICK_DURATION);
+}
+
 static bool CanPause()
 {
 	static constexpr const float PAUSE_INTERVAL = 3.0f;
@@ -336,6 +352,40 @@ DEFINE_HOTKEY_SAVESTATE_X(10, TRANSLATE_NOOP("Hotkeys", "Save State To Slot 10")
 DEFINE_HOTKEY_LOADSTATE_X(10, TRANSLATE_NOOP("Hotkeys", "Load State From Slot 10"))
 #undef DEFINE_HOTKEY_SAVESTATE_X
 #undef DEFINE_HOTKEY_LOADSTATE_X
+
+DEFINE_HOTKEY("SelectPreviousCard", TRANSLATE_NOOP("Hotkeys", "IC Cards"),
+	TRANSLATE_NOOP("Hotkeys", "Select Previous IC Card"), [](s32 pressed) {
+		if (!pressed && VMManager::HasValidVM())
+			Host::RunOnCPUThread([]() { HotkeySelectICCard(false); });
+	})
+DEFINE_HOTKEY("SelectNextCard", TRANSLATE_NOOP("Hotkeys", "IC Cards"),
+	TRANSLATE_NOOP("Hotkeys", "Select Next IC Card"), [](s32 pressed) {
+		if (!pressed && VMManager::HasValidVM())
+			Host::RunOnCPUThread([]() { HotkeySelectICCard(true); });
+	})
+DEFINE_HOTKEY("InsertSelectedCard", TRANSLATE_NOOP("Hotkeys", "IC Cards"),
+	TRANSLATE_NOOP("Hotkeys", "Insert Selected IC Card"), [](s32 pressed) {
+		if (!pressed && VMManager::HasValidVM())
+			Host::RunOnCPUThread([]() { HotkeyInsertICCard(VMManager::GetSelectedICCard()); });
+	})
+
+#define DEFINE_HOTKEY_INSERT_CARD(cardnum, title) \
+	DEFINE_HOTKEY("InsertCard" #cardnum, TRANSLATE_NOOP("Hotkeys", "IC Cards"), title, [](s32 pressed) { \
+		if (!pressed && VMManager::HasValidVM()) \
+			Host::RunOnCPUThread([]() { HotkeyInsertICCard(cardnum); }); \
+	})
+DEFINE_HOTKEY_INSERT_CARD(0, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 0"))
+DEFINE_HOTKEY_INSERT_CARD(1, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 1"))
+DEFINE_HOTKEY_INSERT_CARD(2, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 2"))
+DEFINE_HOTKEY_INSERT_CARD(3, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 3"))
+DEFINE_HOTKEY_INSERT_CARD(4, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 4"))
+DEFINE_HOTKEY_INSERT_CARD(5, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 5"))
+DEFINE_HOTKEY_INSERT_CARD(6, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 6"))
+DEFINE_HOTKEY_INSERT_CARD(7, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 7"))
+DEFINE_HOTKEY_INSERT_CARD(8, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 8"))
+DEFINE_HOTKEY_INSERT_CARD(9, TRANSLATE_NOOP("Hotkeys", "Insert IC Card 9"))
+#undef DEFINE_HOTKEY_INSERT_CARD
+
 DEFINE_HOTKEY("Mute", TRANSLATE_NOOP("Hotkeys", "Audio"), TRANSLATE_NOOP("Hotkeys", "Toggle Mute"), [](s32 pressed) {
 	if (!pressed && VMManager::HasValidVM())
 		HotkeyToggleMute();

@@ -85,6 +85,7 @@
 
 #include "DEV9/ACATA.h"
 #include "DEV9/ACATAPI.h"
+#include "DEV9/ACDruagaCardReader.h"
 #include "DEV9/ACJV.h"
 #include "DEV9/ACSRAM.h"
 
@@ -191,7 +192,9 @@ static std::pair<u32, u32> s_elf_text_range;
 static bool s_elf_executed = false;
 static std::string s_elf_override;
 static std::string s_acgame;
+static std::string s_acgame_data_directory;
 static std::string s_acgame_serial;
+static u8 s_selected_ic_card = 0;
 std::string ArcadeiLinkID;
 static std::string s_input_profile_name;
 static u32 s_frame_advance_count = 0;
@@ -344,6 +347,41 @@ std::string VMManager::GetDiscPath()
 {
 	std::unique_lock lock(s_info_mutex);
 	return CDVDsys_GetFile(CDVDsys_GetSourceType());
+}
+
+std::string VMManager::GetArcadeGameDataDirectory()
+{
+	std::unique_lock lock(s_info_mutex);
+	return s_acgame_data_directory;
+}
+
+u8 VMManager::GetSelectedICCard()
+{
+	std::unique_lock lock(s_info_mutex);
+	return s_selected_ic_card;
+}
+
+u8 VMManager::SelectPreviousICCard()
+{
+	std::unique_lock lock(s_info_mutex);
+	s_selected_ic_card = (s_selected_ic_card == 0) ? 9 : (s_selected_ic_card - 1);
+	return s_selected_ic_card;
+}
+
+u8 VMManager::SelectNextICCard()
+{
+	std::unique_lock lock(s_info_mutex);
+	s_selected_ic_card = (s_selected_ic_card == 9) ? 0 : (s_selected_ic_card + 1);
+	return s_selected_ic_card;
+}
+
+bool VMManager::InsertICCard(u8 card)
+{
+	const std::string serial = GetDiscSerial();
+	if (serial == "NM00028")
+		return ACDruagaCardReader::InsertCard(card);
+
+	return false;
 }
 
 std::string VMManager::GetDiscSerial()
@@ -1486,6 +1524,10 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				Console.WriteLnFmt(Color_Green, "ACGAME: sram:'{}'", ACSRAM::filepath);
 				Console.WriteLnFmt(Color_Green, "ACGAME: media:'{}'", ACATA::imgpath);
 
+				{
+					std::unique_lock lock(s_info_mutex);
+					s_acgame_data_directory = std::move(basedir);
+				}
 				return true;
 			}
 		}
@@ -1918,6 +1960,7 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	{
 		std::unique_lock lock(s_info_mutex);
+		s_acgame_data_directory = {};
 		ClearDiscDetails();
 	}
 

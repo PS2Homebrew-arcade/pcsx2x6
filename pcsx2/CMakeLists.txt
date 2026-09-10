@@ -325,6 +325,7 @@ set(pcsx2DEV9Sources
 	DEV9/ACATA_IO.cpp
 	DEV9/ACATA_IO_CHD.cpp
 	DEV9/ACATAPI.cpp
+	DEV9/ACDruagaCardReader.cpp
 	DEV9/ACJV.cpp
 	DEV9/ACUART.cpp
 	DEV9/ACUART_GLUE.cpp
@@ -333,6 +334,7 @@ set(pcsx2DEV9Sources
 
 # DEV9 headers
 set(pcsx2DEV9Headers
+	DEV9/ACDruagaCardReader.h
 	DEV9/AdapterUtils.h
 	DEV9/ATA/ATA.h
 	DEV9/ATA/HddCreate.h
