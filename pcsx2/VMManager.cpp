@@ -1463,7 +1463,11 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 				// Attach the 2nd GunCon2 only for 2-player games, so 1-player cabinets show no extra crosshair.
 				const bool lightgun = (mode == JVS_MODE::LIGHTGUN);
 				const bool two_gun = lightgun && ACJV::GetGunMapping().p2_start != 0;
-				Host::SetBaseStringSettingValue("USB1", "Type", lightgun ? "guncon2" : "None");
+				// Non-lightgun games can specify their USB1 device via the .acgame's
+				// [data] usb= key (default None). Without this, every boot resets
+				// USB1 to None, wiping a configured UE PCB (netplay) device.
+				const std::string usb1_type = lightgun ? std::string("guncon2") : INI.GetStringValue("data", "usb", "None");
+				Host::SetBaseStringSettingValue("USB1", "Type", usb1_type.c_str());
 				Host::SetBaseStringSettingValue("USB2", "Type", two_gun ? "guncon2" : "None");
 				ACJV::SetMode(mode);
 				Console.WriteLn(Color_Green, "ACGAME: jvsmode=%s -> JVS device mode %d%s",
