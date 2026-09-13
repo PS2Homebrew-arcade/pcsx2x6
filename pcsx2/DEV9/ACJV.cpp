@@ -425,6 +425,7 @@ static const std::map<std::string, StandardLayout> s_standard_layouts = {
 	{"NM10003", StandardLayout::TECHNICBEAT}, // Technic Beat (unique unofficial gameid; NM00003 = Vampire Night, GameIndex PR #92)
 	{"NM00030", StandardLayout::GUNDAMQUIZ},  // Gundam Quiz Warrior (moved from Fighting: a quiz, not a fighter)
 	{"NM00037", StandardLayout::INUFUKU},     // Quiz Suku Suku Inufuku 2
+	{"NM00028", StandardLayout::DRUAGA},      // Druaga Online
 };
 
 // Drum (Taiko) and twin-stick (Zoids) gameids for ResolveModeFromGameId (no per-button table).
@@ -446,7 +447,6 @@ JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
 {
 	if (s_racing_layouts.count(gameid))   return JVS_MODE::DRIVE;
 	if (s_fighting_layouts.count(gameid)) return JVS_MODE::FIGHTING;
-	if (s_standard_layouts.count(gameid)) return JVS_MODE::STANDARD;
 	if (s_gun_mappings.count(gameid))     return JVS_MODE::LIGHTGUN;
 	if (std::ranges::find(s_drum_games, gameid) != std::ranges::end(s_drum_games))
 		return JVS_MODE::DRUM;
@@ -454,6 +454,7 @@ JVS_MODE ACJV::ResolveModeFromGameId(const std::string& gameid)
 		return JVS_MODE::TWINSTICK;
 	if (std::ranges::find(s_touch_games, gameid) != std::ranges::end(s_touch_games))
 		return JVS_MODE::TOUCH;
+	if (s_standard_layouts.count(gameid)) return JVS_MODE::STANDARD;
 	return JVS_MODE::DEFAULT;
 }
 
@@ -496,6 +497,7 @@ std::span<const InputBindingInfo> ACJV::GetStandardButtons()
 		case StandardLayout::TECHNICBEAT: return s_standard_technicbeat;
 		case StandardLayout::GUNDAMQUIZ:  return s_standard_gundamquiz;
 		case StandardLayout::INUFUKU:     return s_standard_inufuku;
+		case StandardLayout::DRUAGA:      return s_standard_druaga;
 	}
 	return {};
 }
