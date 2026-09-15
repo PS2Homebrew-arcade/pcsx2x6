@@ -663,7 +663,7 @@ namespace usb_lightgun
 				// switch, so there the bind forces the camera-lost report = a manual reload.
 				case BID_A:
 					if (ACJV::GetGunMapping().board == GunBoardModel::CameraVN)
-						ACJV::SetGunForceOffscreen(pressed);
+						ACJV::SetGunForceOffscreen(player, pressed);
 					else
 						ACJV::SetButtonState(player, ACJV::GetGunMapping().pedal, pressed);
 					break;

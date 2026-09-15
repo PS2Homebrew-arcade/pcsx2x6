@@ -182,7 +182,7 @@ namespace ACJV {
     void SetGunAimSource(u32 player, bool joystick);        // lightgun aim source: false = shared mouse, true = player's stick
     void SetGunPointerIndex(u32 player, u32 index);         // host pointer slot for the player's mouse aim (per-device with Raw Input)
     void SetGunRelativeAim(u32 player, float dx, float dy); // player's stick-driven screen position from the GunCon2 (display coords)
-    void SetGunForceOffscreen(bool held);                   // force the camera-lost report (the pedal bind = manual reload on Vampire Night)
+    void SetGunForceOffscreen(u32 player, bool held);       // force that player's camera-lost report (the pedal bind = manual reload on Vampire Night)
     void SetGunOffscreenContour(float fraction);            // width of the aim-beside-the-screen band at the window edge (0..0.05)
     void SetGameId(const std::string& gameid);
     const std::string& GetGameId();
