@@ -1356,6 +1356,18 @@ void do_acjv_packet() {
 			rd16[0x17] = 0x5210;
 		}
 	}
+	Console.WriteLn(Color_Green, "JVS PACKET IN (wr16):");
+    for (int i = 0; i < 0x300; i+=16) {
+        Console.WriteLn("%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+        wrbuf[i], wrbuf[i+1], wrbuf[i+2], wrbuf[i+3], wrbuf[i+4], wrbuf[i+5], wrbuf[i+6], wrbuf[i+7], wrbuf[i+8], wrbuf[i+9], wrbuf[i+10],
+              wrbuf[i+11], wrbuf[i+12], wrbuf[i+13], wrbuf[i+14], wrbuf[i+15]);
+    }
+	Console.WriteLn(Color_Green, "JVS PACKET OUT (rd16):");
+    for (int i = 0; i < 0x300; i+=16) {
+        Console.WriteLn("%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+        rdbuf[i], rdbuf[i+1], rdbuf[i+2], rdbuf[i+3], rdbuf[i+4], rdbuf[i+5], rdbuf[i+6], rdbuf[i+7], rdbuf[i+8], rdbuf[i+9], rdbuf[i+10],
+              rdbuf[i+11], rdbuf[i+12], rdbuf[i+13], rdbuf[i+14], rdbuf[i+15]);
+    }
 }
 
 // Free-run the FCA-1 input frame for Ridge Racer V in the rdbuf (do_acjv_packet never runs for it).
