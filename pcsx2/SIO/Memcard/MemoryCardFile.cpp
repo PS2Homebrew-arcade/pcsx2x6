@@ -34,6 +34,8 @@ static constexpr int MC2_ERASE_SIZE = 528 * 16;
 
 static const char* s_folder_mem_card_id_file = "_pcsx2_superblock";
 
+static bool IsNoECCMemoryCardSize(s64 size);
+
 bool FileMcd_Open = false;
 
 // ECC code ported from mymc
@@ -164,6 +166,7 @@ protected:
 	std::vector<u8> m_currentdata;
 	u64 m_chksum[8] = {};
 	bool m_ispsx[8] = {};
+	bool m_isConverted[8] = {};
 	u32 m_chkaddr = 0;
 
 public:
@@ -293,8 +296,10 @@ void FileMemoryCard::Open()
 						fname));
 			}
 		}
+		m_isConverted[slot] = false;
+		const bool needs_conversion = IsNoECCMemoryCardSize(FileSystem::GetPathFileSize(fname.c_str()));
 
-		if (fname.ends_with(".bin") || fname.ends_with(".mc2"))
+		if (needs_conversion)
 		{
 			std::string newname(fname + "x");
 			if (!ConvertNoECCtoRAW(fname.c_str(), newname.c_str()))
@@ -323,6 +328,7 @@ void FileMemoryCard::Open()
 		}
 		else // Load checksum
 		{
+			m_isConverted[slot] = needs_conversion;
 			m_fileSize[slot] = FileSystem::FSize64(m_file[slot]);
 
 			Console.WriteLnFmt(Color_Green, "McdSlot {} [File]: {} [{} MB, {}]", slot, Path::GetFileName(fname),
@@ -357,13 +363,14 @@ void FileMemoryCard::Close()
 		std::fclose(m_file[slot]);
 		m_file[slot] = nullptr;
 
-		if (m_filenames[slot].ends_with(".bin") || m_filenames[slot].ends_with(".mc2"))
+		if (m_isConverted[slot])
 		{
 			const std::string name_in(m_filenames[slot] + 'x');
 			if (ConvertRAWtoNoECC(name_in.c_str(), m_filenames[slot].c_str()))
 				FileSystem::DeleteFilePath(name_in.c_str());
 		}
 
+		m_isConverted[slot] = false;
 		m_filenames[slot] = {};
 		m_fileSize[slot] = -1;
 	}
@@ -853,6 +860,14 @@ static MemoryCardFileType GetMemoryCardFileTypeFromSize(s64 size)
 		return MemoryCardFileType::PS1;
 	else
 		return MemoryCardFileType::Unknown;
+}
+
+static bool IsNoECCMemoryCardSize(s64 size)
+{
+	return size == _8mb ||
+	       size == _16mb ||
+	       size == _32mb ||
+	       size == _64mb;
 }
 
 static bool FileMcd_IsFolder(const std::string& path)
